@@ -38,8 +38,8 @@ sell_id = add_trade_record(
 )
 ```
 
-### 自动方式（使用 AKshare 获取实时数据）
-使用 AKshare 自动获取开盘价和收盘价：
+### 自动方式（使用 Baostock/新浪获取实时数据）
+自动获取开盘价和收盘价：
 
 ```python
 # 添加交易并自动获取市场数据
@@ -53,41 +53,35 @@ record_id = add_trade_with_market_data(
 )
 ```
 
-## AKshare 股票数据查询
+## 股票数据查询
 
 ### 获取实时股票信息
 ```python
 info = get_stock_info('600000')
-print(f"当前价: {info['current_price']}")
+print(f"当前价: {info.get('current_price', info.get('closing_price'))}")
 print(f"涨跌幅: {info['price_change_pct']}%")
-```
-
-### 获取日线行情
-```python
-# 获取最近 30 天的日线数据
-daily_df = get_stock_daily('600000', period='30')
-print(daily_df[['date', 'open', 'close', 'volume']])
-```
-
-### 获取股票列表
-```python
-# 获取所有 A 股的代码和名称
-stocks = get_stock_list()
-print(stocks)
 ```
 
 ## 常用操作
 
 ### 查看所有交易记录
 ```python
-all_records = get_all_records()
+all_records = query_records()
 print(all_records)
 ```
 
 ### 查看特定股票的记录
 ```python
-records = get_all_records('600000')
+records = query_records(stock_code='600000')
 print(records)
+```
+
+### 分页查询
+```python
+# 第1页，每页20条
+page1 = query_records(page=1, per_page=20)
+# 第2页
+page2 = query_records(page=2, per_page=20)
 ```
 
 ### 查看股票统计汇总
@@ -98,18 +92,33 @@ print(summary)
 
 ## 更新操作
 
-### 更新盈亏信息
+### 更新交易记录
 ```python
-update_profit_loss(
+update_trade_record(
     record_id=1,
     profit_loss=150.50,
-    reason='目标位获利出场'
+    profit_loss_reason='目标位获利出场'
 )
 ```
 
 ### 删除交易记录
 ```python
-delete_record(record_id=1)
+delete_trade_record(record_id=1)
+```
+
+### 批量删除
+```python
+deleted = bulk_delete_records([1, 2, 3])
+print(f"删除了 {deleted} 条记录")
+```
+
+### 批量更新
+```python
+updated = bulk_update_records(
+    record_ids=[1, 2, 3],
+    trade_basis='批量更新交易依据'
+)
+print(f"更新了 {updated} 条记录")
 ```
 
 ## 实际例子
@@ -123,7 +132,7 @@ buy_id = add_trade_with_market_data(
     quantity=100,
     trade_price=10.50,
     commission_fee=5.25,
-    trade_basis='技术突破 + AKshare 数据确认'
+    trade_basis='技术突破 + 市场数据确认'
 )
 
 # 2. 卖出 50 股
@@ -137,8 +146,8 @@ sell_id = add_trade_with_market_data(
 )
 
 # 3. 查看该股票的所有交易
-df = get_all_records('600000')
-print(df)
+records = query_records(stock_code='600000')
+print(records)
 
 # 4. 查看统计汇总
 summary = get_stock_summary('600000')
@@ -149,21 +158,18 @@ print(summary)
 ```python
 # 1. 查询浦发银行的实时数据
 pfyh_info = get_stock_info('600000')
-print(f"浦发银行当前价: {pfyh_info['current_price']}")
+print(f"浦发银行当前价: {pfyh_info.get('current_price', pfyh_info.get('closing_price'))}")
 print(f"今日涨幅: {pfyh_info['price_change_pct']}%")
 
-# 2. 查询最近 10 天的日线
-daily = get_stock_daily('600000', period='10')
-print(daily)
-
-# 3. 根据数据决定交易
+# 2. 根据数据决定交易
+price = pfyh_info.get('current_price', pfyh_info.get('closing_price'))
 if pfyh_info['price_change_pct'] > 0:
     add_trade_record(
         stock_code='600000',
         stock_name='浦发银行',
         trade_type='buy',
         quantity=100,
-        trade_price=pfyh_info['current_price'],
+        trade_price=price,
         commission_fee=5.0,
         trade_basis='技术面利好'
     )
@@ -191,27 +197,29 @@ for stock_code in ['000001', '000333']:
 ## 常见问题
 
 **Q: 如何修改已添加的交易记录？**
-A: 目前可以通过 `update_profit_loss()` 更新盈亏信息，或使用 `delete_record()` 删除后重新添加。
+A: 使用 `update_trade_record()` 更新记录，或使用 `delete_trade_record()` 删除后重新添加。
 
-**Q: AKshare 需要网络连接吗？**
+**Q: 获取实时数据需要网络连接吗？**
 A: 是的，获取实时数据需要网络。离线模式下可继续添加交易记录。
 
 **Q: 网络不可用时会怎样？**
-A: 系统会自动重试，失败后降级为离线模式，可继续记录交易。
+A: 系统会自动切换数据源，失败后降级为离线模式，可继续记录交易。
 
 **Q: 如何导出数据？**
-A: 使用 `get_all_records()` 返回的 DataFrame：
+A: 使用 `query_records()` 返回的列表：
 ```python
-df = get_all_records()
-df.to_csv('交易记录.csv', index=False)
-df.to_excel('交易记录.xlsx', index=False)
+import csv
+records = query_records()
+with open('交易记录.csv', 'w', newline='', encoding='utf-8') as f:
+    writer = csv.DictWriter(f, fieldnames=records[0].keys() if records else [])
+    writer.writeheader()
+    writer.writerows(records)
 ```
 
 **Q: 如何查询特定时间段的交易？**
-A: 使用 DataFrame 的过滤功能：
+A: 使用列表的过滤功能：
 ```python
-df = get_all_records('600000')
-df['trade_time'] = pd.to_datetime(df['trade_time'])
-recent_trades = df[df['trade_time'] > '2026-05-01']
-print(recent_trades)
-```
+from datetime import datetime
+records = query_records(stock_code='600000')
+recent = [r for r in records if r['trade_time'] >= '2026-05-01']
+print(recent)

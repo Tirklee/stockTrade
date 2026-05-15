@@ -1,19 +1,19 @@
-# 股票交易记录系统 - 集成 AKshare 数据获取
+# 股票交易记录系统
 
 ## 项目完成总结
 
-已成功整合 **AKshare 金融数据库**到股票交易记录系统中，实现了从数据获取到交易记录的完整工作流。
+已成功构建基于 Baostock 和新浪财经的股票交易记录系统。
 
 ## 📦 项目文件结构
 
 ```
 交易记录/
-├── T20260512.ipynb              # 主要 Jupyter Notebook（核心代码）
-├── stock_trades.db              # SQLite 数据库文件
-├── README.md                    # 项目完整文档
-├── QUICK_GUIDE.md              # 快速参考指南
-├── AKSHARE_GUIDE.md            # AKshare 专用使用指南
-└── stocks.db                    # 备用数据库
+├── web_app.py              # Flask Web 应用
+├── trade_service.py        # 核心服务模块
+├── stock_trades.db         # SQLite 数据库文件
+├── README.md               # 项目完整文档
+├── QUICK_GUIDE.md          # 快速参考指南
+└── BUGFIX_SUMMARY.md       # 问题修复记录
 ```
 
 ## 🎯 核心功能
@@ -23,12 +23,10 @@
 - ✅ 交易记录存储和查询
 - ✅ 股票汇总统计
 
-### AKshare 集成模块
-- ✅ 实时股票行情获取
-- ✅ 日线历史数据查询
-- ✅ 股票列表查询
+### 数据获取模块
+- ✅ Baostock 实时股票行情获取（主数据源）
+- ✅ 新浪财经 API 实时行情（备选数据源）
 - ✅ 自动数据填充交易记录
-- ✅ 网络故障自动重试和降级
 
 ### 交易管理模块
 - ✅ 添加交易记录
@@ -52,36 +50,39 @@
 | quantity | INTEGER | 交易数量 |
 | opening_price | REAL | 开盘价 |
 | closing_price | REAL | 收盘价 |
+| high_price | REAL | 最高价 |
+| low_price | REAL | 最低价 |
 | trade_price | REAL | 实际交易价格 |
 | commission_fee | REAL | 交易手续费 |
 | profit_loss | REAL | 盈亏金额 |
 | profit_loss_reason | TEXT | 盈亏原因 |
 | trade_basis | TEXT | 交易依据 |
 | created_at | TIMESTAMP | 创建时间 |
+| updated_at | TIMESTAMP | 更新时间 |
 
 ## 🔧 主要函数概览
 
 ### 交易记录函数
 ```python
 add_trade_record()              # 添加交易记录
-get_all_records()               # 查询交易记录
+query_records()                 # 查询交易记录
 get_stock_summary()             # 获取统计汇总
-update_profit_loss()            # 更新盈亏信息
-delete_record()                 # 删除交易记录
+update_trade_record()           # 更新交易记录
+delete_trade_record()           # 删除交易记录
+bulk_delete_records()           # 批量删除
+bulk_update_records()           # 批量更新
 ```
 
-### AKshare 数据获取函数
+### 数据获取函数
 ```python
 get_stock_info()                # 获取实时股票信息
-get_stock_daily()               # 获取日线行情数据
-get_stock_list()                # 获取股票列表
 add_trade_with_market_data()    # 自动添加交易（含市场数据）
 ```
 
 ## 📚 使用文档
 
 ### 1. 快速开始（QUICK_GUIDE.md）
-- 最常用的 10 个操作
+- 最常用的操作
 - 代码示例一目了然
 - 新手推荐阅读
 
@@ -89,11 +90,6 @@ add_trade_with_market_data()    # 自动添加交易（含市场数据）
 - 详细的 API 说明
 - 参数和返回值说明
 - 适合深入学习
-
-### 3. AKshare 专用指南（AKSHARE_GUIDE.md）
-- AKshare 功能详解
-- 4 大使用场景
-- 数据分析示例
 
 ## 🚀 快速使用示例
 
@@ -113,51 +109,47 @@ add_trade_record(
 
 ### 自动获取市场数据
 ```python
-# 自动从 AKshare 获取数据
+# 自动从 Baostock/新浪获取数据
 add_trade_with_market_data(
     stock_code='600000',
     trade_type='buy',
     quantity=100,
     trade_price=10.50,
     commission_fee=5.25,
-    trade_basis='AKshare 数据确认'
+    trade_basis='市场数据确认'
 )
 ```
 
 ### 查询和分析
 ```python
-# 查询所有交易
-all_trades = get_all_records()
+# 分页查询交易记录
+records = query_records(page=1, per_page=20)
 
 # 查询特定股票
-pfyh_trades = get_all_records('600000')
+records = query_records(stock_code='600000')
 
 # 获取统计汇总
 summary = get_stock_summary('600000')
 print(f"总盈亏: {summary['total_profit_loss']}")
 ```
 
-## 🌐 网络连接说明
+## 🌐 数据源说明
 
-| 模式 | 说明 | 使用场景 |
-|-----|------|---------|
-| 在线 | 自动获取实时数据 | 有网络连接，需要最新数据 |
-| 离线 | 本地数据库操作 | 无网络或网络不稳定 |
-| 自动降级 | 尝试在线，失败自动离线 | 网络不稳定 |
+| 数据源 | 优先级 | 说明 |
+|-------|--------|------|
+| Baostock | 主数据源 | 专为A股设计，稳定免费 |
+| 新浪财经 | 备选数据源 | HTTP请求，无需安装 |
 
 系统支持：
-- ✅ 自动重试（最多 3 次）
-- ✅ 网络故障优雅降级
+- ✅ 自动切换数据源
+- ✅ 网络故障降级处理
 - ✅ 完整的离线功能
 
 ## 📦 依赖包
 
 ```
-sqlite3         # 数据库
-pandas          # 数据分析
-akshare         # 股票数据获取
-tqdm            # 进度显示
-ipywidgets      # Jupyter 支持
+flask              # Web 框架
+baostock          # 股票数据获取（主数据源）
 ```
 
 ## ✨ 功能亮点
@@ -166,23 +158,23 @@ ipywidgets      # Jupyter 支持
    - 所有交易记录永久保存
    - 支持复杂的 SQL 查询
 
-2. **实时金融数据获取**
-   - 集成 AKshare（开源中文金融库）
-   - 获取 A 股实时行情和历史数据
+2. **多数据源金融数据获取**
+   - Baostock（主数据源）
+   - 新浪财经 API（备选）
 
 3. **智能网络处理**
-   - 自动重试机制
+   - 自动切换数据源
    - 在线/离线无缝切换
    - 优雅的错误处理
 
-4. **灵活的数据查询**
-   - Pandas DataFrame 支持
-   - 支持导出 CSV/Excel
-   - 可自定义分析
+4. **Web 界面操作**
+   - Flask Web 应用
+   - Bootstrap 前端
+   - 分页查询支持
 
 5. **详尽的文档**
-   - 三份不同深度的文档
-   - 丰富的使用示例
+   - 快速参考指南
+   - 完整的 API 文档
    - 常见问题解答
 
 ## 🔄 完整工作流示例
@@ -221,29 +213,6 @@ sell_id = add_trade_record(
 # 5. 查看交易统计
 summary = get_stock_summary('600000')
 print(f"总盈亏: {summary['total_profit_loss']:.2f}")
-
-# 6. 导出数据
-df = get_all_records()
-df.to_csv('trades.csv', index=False)
-```
-
-## 📈 数据分析示例
-
-```python
-# 获取交易数据
-trades = get_all_records()
-
-# 按交易类型统计
-buy_trades = trades[trades['trade_type'] == 'buy']
-sell_trades = trades[trades['trade_type'] == 'sell']
-
-# 计算平均价格
-avg_buy_price = (buy_trades['trade_price'] * buy_trades['quantity']).sum() / buy_trades['quantity'].sum()
-avg_sell_price = (sell_trades['trade_price'] * sell_trades['quantity']).sum() / sell_trades['quantity'].sum()
-
-print(f"平均买入价: {avg_buy_price:.2f}")
-print(f"平均卖出价: {avg_sell_price:.2f}")
-print(f"平均价差: {avg_sell_price - avg_buy_price:.2f}")
 ```
 
 ## 🛠️ 扩展建议
@@ -254,20 +223,15 @@ print(f"平均价差: {avg_sell_price - avg_buy_price:.2f}")
 | 收益率计算 | 高 | 按时间段统计收益 |
 | 止损/止盈提醒 | 中 | 价格提醒功能 |
 | 数据可视化 | 中 | 图表展示 |
-| 多数据源支持 | 低 | 支持 Tushare 等其他源 |
 
 ## 📞 故障排查
 
-### 问题：AKshare 数据获取失败
-- **原因**：网络连接问题，AKshare 服务器不可达
+### 问题：数据获取失败
+- **原因**：网络连接问题，数据源服务器不可达
 - **解决**：
   1. 检查网络连接
   2. 使用离线模式继续工作
   3. 手动指定股票名称参数
-
-### 问题：Jupyter 内核卡死
-- **原因**：网络请求超时
-- **解决**：重启内核，使用离线模式
 
 ### 问题：数据库锁定错误
 - **原因**：多个进程访问数据库
@@ -275,17 +239,17 @@ print(f"平均价差: {avg_sell_price - avg_buy_price:.2f}")
 
 ## 📝 更新日志
 
+### v2.0 (2026-05-16)
+- ✅ 移除 akshare 依赖
+- ✅ 使用 Baostock + 新浪财经作为数据源
+- ✅ 添加 Flask Web 应用
+- ✅ 支持批量操作
+
 ### v1.0 (2026-05-13)
 - ✅ 基础交易记录系统
 - ✅ SQLite 数据库管理
-- ✅ AKshare 集成
-- ✅ 完整文档编写
-
-## 📄 许可证
-
-本项目遵循开源精神，免费使用和修改。
+- ✅ 文档编写
 
 ---
 
-**项目维护**：自动更新时间：2026-05-13
-**联系支持**：查看各文档的常见问题部分
+**项目维护**：更新时间：2026-05-16

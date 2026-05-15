@@ -29,13 +29,6 @@ except ImportError:
     baostock = None
     BAOSTOCK_AVAILABLE = False
 
-# 2. akshare - 备选数据源（部分接口已关闭但仍有可用接口）
-try:
-    import akshare as ak
-    AKSHARE_AVAILABLE = True
-except ImportError:
-    ak = None
-    AKSHARE_AVAILABLE = False
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_FILE = os.path.join(BASE_DIR, 'stock_trades.db')
@@ -628,35 +621,6 @@ def _fetch_from_sina(stock_code: str) -> Optional[Dict]:
         return None
 
 
-def _fetch_from_akshare(stock_code: str) -> Optional[Dict]:
-    """从 AKShare 获取股票行情数据（第三备选数据源）"""
-    if not AKSHARE_AVAILABLE:
-        return None
-    try:
-        formatted = stock_code
-        if not stock_code.startswith(('sh', 'sz')):
-            formatted = 'sh' + stock_code if stock_code.startswith('6') else 'sz' + stock_code
-        
-        data = ak.stock_zh_a_spot()
-        row = data[data['代码'] == formatted]
-        if row.empty:
-            return None
-        row = row.iloc[0]
-        logger.info(f"AKShare获取数据成功: {row['名称']}({stock_code})")
-        return {
-            'stock_code': row['代码'],
-            'stock_name': row['名称'],
-            'opening_price': float(row['今开']),
-            'closing_price': float(row['昨收']),
-            'high_price': float(row['最高']),
-            'low_price': float(row['最低']),
-            'price_change_pct': float(row['涨跌幅']),
-        }
-    except Exception as e:
-        logger.warning(f"AKShare获取数据失败 ({stock_code}): {e}")
-        return None
-
-
 def get_stock_info(stock_code: str) -> Dict:
     """
     获取股票行情信息（多数据源策略）
@@ -664,7 +628,6 @@ def get_stock_info(stock_code: str) -> Dict:
     数据源优先级：
     1. Baostock（推荐，专为A股设计，稳定免费）
     2. 新浪财经API（免费备选，简单HTTP请求）
-    3. AKShare（第三备选，部分接口已关闭）
     
     Args:
         stock_code: 股票代码（如 600000）
@@ -688,15 +651,7 @@ def get_stock_info(stock_code: str) -> Dict:
     if result:
         logger.info(f"✓ 新浪财经 获取数据成功: {result['stock_name']}({stock_code})")
         return result
-    logger.warning(f"✗ 新浪财经 获取数据失败，尝试下一个数据源...")
-    
-    # 目标3: AKShare - 最后尝试
-    if AKSHARE_AVAILABLE:
-        result = _fetch_from_akshare(stock_code)
-        if result:
-            logger.info(f"✓ AKShare 获取数据成功: {result['stock_name']}({stock_code})")
-            return result
-        logger.warning(f"✗ AKShare 获取数据失败")
+    logger.warning(f"✗ 新浪财经 获取数据失败")
     
     logger.warning(f"所有数据源均无法获取 {stock_code} 的行情数据")
     return {}
