@@ -140,6 +140,19 @@ def position_pnl():
     pnl_data = trade_service.calculate_position_pnl(stock_code)
     return jsonify(pnl_data)
 
+@main_bp.route('/api/portfolio/summary')
+def portfolio_summary():
+    """获取总体账户盈亏"""
+    summary = trade_service.calculate_portfolio_summary()
+    return jsonify(summary)
+
+@main_bp.route('/api/sell', methods=['POST'])
+def sell_stock():
+    """卖出股票"""
+    data = request.get_json()
+    success, message, trade_id = trade_service.sell_stock(data)
+    return jsonify({'success': success, 'message': message, 'trade_id': trade_id})
+
 @main_bp.route('/api/brokers')
 def brokers():
     """获取券商列表"""

@@ -224,21 +224,210 @@ class TradeService:
         """计算持仓盈亏"""
         conn = sqlite3.connect(DB_FILE)
         cursor = conn.cursor()
+        
+        # 获取所有交易记录
         cursor.execute('''
-            SELECT 
-                SUM(CASE WHEN trade_type='buy' THEN quantity * trade_price ELSE 0 END) as total_buy,
-                SUM(CASE WHEN trade_type='sell' THEN quantity * trade_price ELSE 0 END) as total_sell,
-                SUM(CASE WHEN trade_type='buy' THEN quantity ELSE 0 END) as buy_qty,
-                SUM(CASE WHEN trade_type='sell' THEN quantity ELSE 0 END) as sell_qty
-            FROM trade_records WHERE stock_code = ?
+            SELECT id, trade_time, trade_type, quantity, trade_price, stock_name
+            FROM trade_records 
+            WHERE stock_code = ?
+            ORDER BY trade_time ASC
         ''', (stock_code.upper(),))
-        row = cursor.fetchone()
+        
+        records = cursor.fetchall()
+        
+        if not records:
+            conn.close()
+            return {
+                'total_buy': 0,
+                'total_sell': 0,
+                'position_qty': 0,
+                'positions': [],
+                'avg_cost': 0,
+                'current_pnl': 0,
+                'current_pnl_rate': 0
+            }
+        
+        # 计算持仓
+        total_buy = 0
+        total_sell = 0
+        buy_qty = 0
+        sell_qty = 0
+        positions = []
+        
+        for record in records:
+            trade_id, trade_time, trade_type, quantity, trade_price, stock_name = record
+            
+            if trade_type == 'buy':
+                total_buy += quantity * trade_price
+                buy_qty += quantity
+            else:
+                total_sell += quantity * trade_price
+                sell_qty += quantity
+        
+        # 计算持仓数量和平均成本
+        position_qty = buy_qty - sell_qty
+        avg_cost = total_buy / buy_qty if buy_qty > 0 else 0
+        
+        # 获取当前价格
+        from app.services.stock_service import StockService
+        stock_service = StockService()
+        realtime = stock_service.get_realtime_data(stock_code.upper())
+        current_price = realtime.get('current', avg_cost) if not realtime.get('error') else avg_cost
+        
+        # 计算持仓市值和盈亏
+        position_value = position_qty * current_price
+        total_cost = position_qty * avg_cost
+        current_pnl = position_value - total_cost
+        current_pnl_rate = (current_pnl / total_cost * 100) if total_cost > 0 else 0
+        
+        # 生成持仓明细（按买入记录计算）
+        cursor.execute('''
+            SELECT id, trade_time, trade_type, quantity, trade_price
+            FROM trade_records 
+            WHERE stock_code = ? AND trade_type = 'buy'
+            ORDER BY trade_time ASC
+        ''', (stock_code.upper(),))
+        
+        buy_records = cursor.fetchall()
+        remaining_qty = position_qty
+        
+        for record in buy_records:
+            if remaining_qty <= 0:
+                break
+            trade_id, trade_time, trade_type, quantity, trade_price = record
+            pos_qty = min(quantity, remaining_qty)
+            cost_price = trade_price
+            pnl = (current_price - cost_price) * pos_qty
+            pnl_rate = ((current_price - cost_price) / cost_price * 100) if cost_price > 0 else 0
+            
+            positions.append({
+                'trade_id': trade_id,
+                'trade_time': trade_time[:10] if trade_time else '',
+                'trade_type': trade_type,
+                'quantity': pos_qty,
+                'cost_price': cost_price,
+                'current_price': current_price,
+                'pnl': pnl,
+                'pnl_rate': pnl_rate
+            })
+            
+            remaining_qty -= pos_qty
+        
         conn.close()
         
-        if row:
-            return {
-                'total_buy': row[0] or 0,
-                'total_sell': row[1] or 0,
-                'position_qty': (row[2] or 0) - (row[3] or 0)
-            }
-        return {'total_buy': 0, 'total_sell': 0, 'position_qty': 0}
+        return {
+            'total_buy': total_buy,
+            'total_sell': total_sell,
+            'position_qty': position_qty,
+            'avg_cost': avg_cost,
+            'current_price': current_price,
+            'position_value': position_value,
+            'current_pnl': current_pnl,
+            'current_pnl_rate': current_pnl_rate,
+            'positions': positions,
+            'stock_name': stock_name
+        }
+    
+    def calculate_portfolio_summary(self) -> Dict:
+        """计算总体账户盈亏"""
+        conn = sqlite3.connect(DB_FILE)
+        cursor = conn.cursor()
+        
+        # 获取所有股票代码
+        cursor.execute('SELECT DISTINCT stock_code FROM trade_records WHERE stock_code IS NOT NULL')
+        stock_codes = [row[0] for row in cursor.fetchall()]
+        
+        total_assets = 0  # 持仓市值
+        total_cost = 0    # 总成本
+        total_pnl = 0     # 总盈亏
+        
+        from app.services.stock_service import StockService
+        stock_service = StockService()
+        
+        for stock_code in stock_codes:
+            cursor.execute('''
+                SELECT 
+                    SUM(CASE WHEN trade_type='buy' THEN quantity ELSE 0 END) as buy_qty,
+                    SUM(CASE WHEN trade_type='buy' THEN quantity * trade_price ELSE 0 END) as buy_amount,
+                    SUM(CASE WHEN trade_type='sell' THEN quantity ELSE 0 END) as sell_qty,
+                    SUM(CASE WHEN trade_type='sell' THEN quantity * trade_price ELSE 0 END) as sell_amount
+                FROM trade_records WHERE stock_code = ?
+            ''', (stock_code,))
+            
+            row = cursor.fetchone()
+            buy_qty = row[0] or 0
+            buy_amount = row[1] or 0
+            sell_qty = row[2] or 0
+            sell_amount = row[3] or 0
+            
+            position_qty = buy_qty - sell_qty
+            if position_qty <= 0:
+                continue
+            
+            avg_cost = buy_amount / buy_qty if buy_qty > 0 else 0
+            
+            # 获取当前价格
+            realtime = stock_service.get_realtime_data(stock_code)
+            current_price = realtime.get('current', avg_cost) if not realtime.get('error') else avg_cost
+            
+            position_value = position_qty * current_price
+            position_cost = position_qty * avg_cost
+            
+            total_assets += position_value
+            total_cost += position_cost
+        
+        total_pnl = total_assets - total_cost
+        pnl_rate = (total_pnl / total_cost * 100) if total_cost > 0 else 0
+        
+        conn.close()
+        
+        return {
+            'total_assets': total_assets,
+            'total_cost': total_cost,
+            'total_pnl': total_pnl,
+            'pnl_rate': pnl_rate
+        }
+    
+    def sell_stock(self, data: Dict) -> tuple:
+        """卖出股票"""
+        try:
+            stock_code = data.get('stock_code', '').upper()
+            stock_name = data.get('stock_name', '')
+            quantity = int(data.get('quantity', 0))
+            trade_price = float(data.get('trade_price', 0))
+            commission_fee = float(data.get('commission_fee', 0))
+            trade_basis = data.get('trade_basis', '')
+            
+            if not stock_code or quantity <= 0 or trade_price <= 0:
+                return False, '参数错误', None
+            
+            trade_time = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            
+            conn = sqlite3.connect(DB_FILE)
+            cursor = conn.cursor()
+            cursor.execute('''
+                INSERT INTO trade_records
+                (trade_time, stock_code, stock_name, asset_type, trade_type, quantity,
+                 trade_price, commission_fee, profit_loss, trade_basis)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                trade_time,
+                stock_code,
+                stock_name,
+                'stock',
+                'sell',
+                quantity,
+                trade_price,
+                commission_fee,
+                0,  # 卖出时不计算盈亏
+                trade_basis
+            ))
+            
+            trade_id = cursor.lastrowid
+            conn.commit()
+            conn.close()
+            
+            return True, '卖出成功', trade_id
+        except Exception as e:
+            logger.error(f'卖出失败: {e}')
+            return False, str(e), None

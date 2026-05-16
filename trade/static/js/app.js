@@ -914,6 +914,42 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+    // ====== 加载总体盈亏数据 ======
+    async function loadPortfolioSummary() {
+        try {
+            const response = await fetch('/api/portfolio/summary');
+            if (!response.ok) return;
+            
+            const data = await response.json();
+            
+            const totalAssets = data.total_assets || 0;
+            const totalPnl = data.total_pnl || 0;
+            const totalCost = data.total_cost || 0;
+            const pnlRate = data.pnl_rate || 0;
+            
+            document.getElementById('total_assets').textContent = '¥' + totalAssets.toFixed(2);
+            document.getElementById('total_cost').textContent = '¥' + totalCost.toFixed(2);
+            
+            const pnlEl = document.getElementById('total_pnl');
+            const pnlCard = document.getElementById('pnl_card');
+            const pnlSign = totalPnl >= 0 ? '+' : '';
+            pnlEl.textContent = pnlSign + '¥' + totalPnl.toFixed(2);
+            pnlEl.className = 'fs-5 fw-bold ' + (totalPnl >= 0 ? 'text-danger' : 'text-success');
+            if (pnlCard) {
+                pnlCard.className = 'card ' + (totalPnl >= 0 ? 'border-danger' : 'border-success');
+            }
+            
+            const rateEl = document.getElementById('total_pnl_rate');
+            rateEl.textContent = pnlSign + pnlRate.toFixed(2) + '%';
+            rateEl.className = 'fs-5 fw-bold ' + (totalPnl >= 0 ? 'text-danger' : 'text-success');
+        } catch (error) {
+            console.warn('加载总体盈亏失败:', error);
+        }
+    }
+
+    // 页面加载时获取总体盈亏
+    loadPortfolioSummary();
+
     // ====== 盈亏按钮点击显示详情 ======
     document.querySelectorAll('.pnl-btn').forEach(function(btn) {
         btn.addEventListener('click', function(e) {
@@ -1072,4 +1108,194 @@ document.addEventListener('DOMContentLoaded', function () {
             console.warn('加载持仓数据失败:', error);
         }
     }
+
+    // ====== 卖出按钮事件 ======
+    let currentSellStock = null;
+
+    // 监听盈亏模态框中的卖出按钮
+    document.getElementById('modal_sell_btn').addEventListener('click', function() {
+        const stockCode = document.getElementById('modal_stock_code').textContent;
+        const stockName = document.getElementById('modal_stock_name').textContent;
+        
+        // 获取持仓信息
+        fetch('/api/position/pnl?stock_code=' + encodeURIComponent(stockCode))
+            .then(response => response.json())
+            .then(data => {
+                if (data.position_qty > 0) {
+                    currentSellStock = {
+                        stock_code: stockCode,
+                        stock_name: stockName,
+                        position_qty: data.position_qty,
+                        avg_cost: data.avg_cost,
+                        current_price: data.current_price
+                    };
+                    
+                    // 填充卖出表单
+                    document.getElementById('sell_stock_code').value = stockCode;
+                    document.getElementById('sell_stock_name').value = stockName;
+                    document.getElementById('sell_price').value = data.current_price.toFixed(3);
+                    document.getElementById('sell_available_qty').textContent = data.position_qty;
+                    document.getElementById('sell_quantity').max = data.position_qty;
+                    document.getElementById('sell_quantity').value = Math.min(100, data.position_qty);
+                    
+                    // 计算预估盈亏
+                    calculateSellProfitLoss();
+                    
+                    // 显示卖出模态框
+                    const sellModal = new bootstrap.Modal(document.getElementById('sellModal'));
+                    sellModal.show();
+                } else {
+                    showToast('该股票没有持仓，无法卖出', 'warning');
+                }
+            });
+    });
+
+    // 加载券商到卖出表单
+    async function loadSellBrokers() {
+        try {
+            const response = await fetch('/api/brokers');
+            if (!response.ok) return;
+            
+            const data = await response.json();
+            const sellBrokerSelect = document.getElementById('sell_broker');
+            sellBrokerSelect.innerHTML = '<option value="">请选择券商</option>';
+            
+            if (Array.isArray(data)) {
+                data.forEach(function(broker) {
+                    const option = document.createElement('option');
+                    option.value = broker.id;
+                    option.textContent = broker.name + ' (' + broker.description + ')';
+                    sellBrokerSelect.appendChild(option);
+                    
+                    brokerConfig[broker.id] = {
+                        rate: broker.rate,
+                        minFee: broker.min_fee,
+                        name: broker.name
+                    };
+                });
+            }
+        } catch (error) {
+            console.warn('加载券商失败:', error);
+        }
+    }
+    loadSellBrokers();
+
+    // 计算卖出预估盈亏
+    function calculateSellProfitLoss() {
+        const price = parseFloat(document.getElementById('sell_price').value) || 0;
+        const quantity = parseInt(document.getElementById('sell_quantity').value) || 0;
+        
+        if (currentSellStock && price > 0 && quantity > 0) {
+            const pnl = (price - currentSellStock.avg_cost) * quantity;
+            const pnlRate = (pnl / (currentSellStock.avg_cost * quantity)) * 100;
+            const pnlSign = pnl >= 0 ? '+' : '';
+            const pnlClass = pnl >= 0 ? 'text-danger' : 'text-success';
+            
+            document.getElementById('sell_estimated_pnl').className = 'fw-bold ' + pnlClass;
+            document.getElementById('sell_estimated_pnl').textContent = pnlSign + '¥' + pnl.toFixed(2) + ' (' + pnlSign + pnlRate.toFixed(2) + '%)';
+        } else {
+            document.getElementById('sell_estimated_pnl').textContent = '--';
+        }
+    }
+
+    // 监听卖出表单变化
+    document.getElementById('sell_quantity').addEventListener('input', function() {
+        calculateSellProfitLoss();
+        calculateSellCommission();
+    });
+
+    // 计算卖出佣金
+    function calculateSellCommission() {
+        const quantity = parseInt(document.getElementById('sell_quantity').value) || 0;
+        const price = parseFloat(document.getElementById('sell_price').value) || 0;
+        const broker = document.getElementById('sell_broker').value;
+        
+        if (quantity <= 0 || price <= 0) {
+            document.getElementById('sell_commission_fee').value = '0.000';
+            return;
+        }
+
+        let rate = 0;
+        let minFee = 5;
+        
+        if (broker && brokerConfig[broker]) {
+            rate = brokerConfig[broker].rate;
+            minFee = brokerConfig[broker].minFee;
+        }
+
+        if (rate <= 0) {
+            return;
+        }
+
+        const amount = quantity * price;
+        const commission = amount * (rate / 10000);
+        const finalFee = Math.max(commission, minFee);
+        
+        document.getElementById('sell_commission_fee').value = finalFee.toFixed(3);
+    }
+
+    document.getElementById('sell_broker').addEventListener('change', calculateSellCommission);
+
+    // 监听卖出模态框关闭，重置表单
+    document.getElementById('sellModal').addEventListener('hidden.bs.modal', function() {
+        document.getElementById('sellForm').reset();
+        document.getElementById('sell_commission_fee').value = '0.000';
+        document.getElementById('sell_estimated_pnl').textContent = '--';
+        currentSellStock = null;
+    });
+
+    // 卖出表单提交
+    document.getElementById('sellForm').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        
+        if (!currentSellStock) {
+            showToast('股票信息错误', 'danger');
+            return;
+        }
+
+        const quantity = parseInt(document.getElementById('sell_quantity').value) || 0;
+        if (quantity <= 0 || quantity > currentSellStock.position_qty) {
+            showToast('卖出数量无效', 'danger');
+            return;
+        }
+
+        const trade_price = parseFloat(document.getElementById('sell_price').value) || 0;
+        const commission_fee = parseFloat(document.getElementById('sell_commission_fee').value) || 0;
+        const trade_basis = document.getElementById('sell_basis').value.trim();
+
+        if (!trade_basis) {
+            showToast('请填写卖出依据', 'warning');
+            return;
+        }
+
+        try {
+            const response = await fetch('/api/sell', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    stock_code: currentSellStock.stock_code,
+                    stock_name: currentSellStock.stock_name,
+                    quantity: quantity,
+                    trade_price: trade_price,
+                    commission_fee: commission_fee,
+                    trade_basis: trade_basis
+                })
+            });
+
+            const result = await response.json();
+            
+            if (result.success) {
+                showToast('卖出成功', 'success');
+                bootstrap.Modal.getInstance(document.getElementById('sellModal')).hide();
+                
+                // 刷新页面数据
+                loadPortfolioSummary();
+                loadPositionData(currentSellStock.stock_code);
+            } else {
+                showToast(result.message || '卖出失败', 'danger');
+            }
+        } catch (error) {
+            showToast('卖出失败: ' + error.message, 'danger');
+        }
+    });
 });

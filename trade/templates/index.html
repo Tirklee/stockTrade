@@ -11,6 +11,62 @@
 <body>
 <div class="container-fluid py-3">
     <h1 class="mb-3 fs-4">股票交易管理</h1>
+    
+    <!-- 总体信息区域 -->
+    <div class="row gx-3 mb-3" id="portfolio-summary">
+        <div class="col-md-3">
+            <div class="card bg-primary text-white">
+                <div class="card-body py-2 px-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <div class="small opacity-75">资产总额</div>
+                            <div class="fs-5 fw-bold" id="total_assets">--</div>
+                        </div>
+                        <div><i class="bi bi-wallet2 fs-3 opacity-50"></i></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card" id="pnl_card">
+                <div class="card-body py-2 px-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <div class="small text-muted">总盈亏</div>
+                            <div class="fs-5 fw-bold" id="total_pnl">--</div>
+                        </div>
+                        <div><i class="bi bi-graph-up fs-3 text-muted"></i></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card" id="cost_card">
+                <div class="card-body py-2 px-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <div class="small text-muted">总成本</div>
+                            <div class="fs-5 fw-bold" id="total_cost">--</div>
+                        </div>
+                        <div><i class="bi bi-cash-stack fs-3 text-muted"></i></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-3">
+            <div class="card" id="rate_card">
+                <div class="card-body py-2 px-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <div>
+                            <div class="small text-muted">盈亏率</div>
+                            <div class="fs-5 fw-bold" id="total_pnl_rate">--</div>
+                        </div>
+                        <div><i class="bi bi-percent fs-3 text-muted"></i></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}
@@ -289,6 +345,61 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">
+                <!-- 个股总体盈亏信息 -->
+                <div class="row gx-3 mb-3" id="stock_pnl_summary">
+                    <div class="col-md-3">
+                        <div class="card bg-primary text-white">
+                            <div class="card-body py-2 px-3">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <div class="small opacity-75">持仓市值</div>
+                                        <div class="fs-5 fw-bold" id="modal_position_value">--</div>
+                                    </div>
+                                    <div><i class="bi bi-wallet2 fs-4 opacity-50"></i></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card">
+                            <div class="card-body py-2 px-3">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <div class="small text-muted">持仓成本</div>
+                                        <div class="fs-5 fw-bold" id="modal_position_cost">--</div>
+                                    </div>
+                                    <div><i class="bi bi-cash-stack fs-4 text-muted"></i></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card" id="modal_pnl_card">
+                            <div class="card-body py-2 px-3">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <div class="small text-muted">个股总盈亏</div>
+                                        <div class="fs-5 fw-bold" id="modal_stock_pnl">--</div>
+                                    </div>
+                                    <div><i class="bi bi-graph-up fs-4 text-muted"></i></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-3">
+                        <div class="card">
+                            <div class="card-body py-2 px-3">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <div class="small text-muted">盈亏率</div>
+                                        <div class="fs-5 fw-bold" id="modal_stock_pnl_rate">--</div>
+                                    </div>
+                                    <div><i class="bi bi-percent fs-4 text-muted"></i></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
                 <div class="row">
                     <div class="col-md-5">
                         <div id="modal_stock_chart" style="height: 300px; border-radius: 8px; overflow: hidden; background: #f8f9fa;"></div>
@@ -300,7 +411,12 @@
                         </div>
                     </div>
                     <div class="col-md-7">
-                        <h6 class="text-muted mb-3">持仓盈亏计算</h6>
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h6 class="text-muted mb-0">持仓盈亏计算</h6>
+                            <button type="button" class="btn btn-sm btn-danger" id="modal_sell_btn">
+                                <i class="bi bi-arrow-down-circle me-1"></i>卖出
+                            </button>
+                        </div>
                         <div class="table-responsive">
                             <table class="table table-sm table-bordered">
                                 <thead class="table-light">
@@ -331,6 +447,69 @@
                     </div>
                 </div>
             </div>
+        </div>
+    </div>
+</div>
+
+<!-- Sell Modal -->
+<div class="modal fade" id="sellModal" tabindex="-1" aria-labelledby="sellModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title text-danger" id="sellModalLabel">
+                    <i class="bi bi-arrow-down-circle me-2"></i>卖出股票
+                </h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form id="sellForm">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">股票代码</label>
+                        <input type="text" class="form-control" id="sell_stock_code" readonly />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">股票名称</label>
+                        <input type="text" class="form-control" id="sell_stock_name" readonly />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">当前价格 <span class="text-muted">(自动获取)</span></label>
+                        <input type="text" class="form-control" id="sell_price" readonly />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">卖出数量 <span class="text-danger">*</span></label>
+                        <input type="number" class="form-control" id="sell_quantity" min="1" required />
+                        <div class="form-text">可卖数量: <span id="sell_available_qty">--</span></div>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">券商 <span class="text-danger">*</span></label>
+                        <select class="form-select" id="sell_broker" required>
+                            <option value="">请选择券商</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">券商佣金比例 <span class="text-muted">(万)</span></label>
+                        <input type="text" class="form-control" id="sell_commission_rate" placeholder="如: 1.5" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">手续费</label>
+                        <input type="text" class="form-control" id="sell_commission_fee" readonly value="0.000" />
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">依据 <span class="text-danger">*</span></label>
+                        <textarea class="form-control" id="sell_basis" rows="2" required placeholder="卖出依据..."></textarea>
+                    </div>
+                    <div class="alert alert-info">
+                        <div class="d-flex justify-content-between">
+                            <span>预计盈亏:</span>
+                            <span class="fw-bold" id="sell_estimated_pnl">--</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="submit" class="btn btn-danger">确认卖出</button>
+                </div>
+            </form>
         </div>
     </div>
 </div>
