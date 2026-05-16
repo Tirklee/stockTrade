@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>股票交易录入服务</title>
+    <title>股票交易管理</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap.min.css') }}" />
     <link rel="stylesheet" href="{{ url_for('static', filename='css/custom.css') }}" />
     <script src="https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js"></script>
 </head>
 <body>
 <div class="container-fluid py-3">
-    <h1 class="mb-3 fs-4">股票交易录入服务</h1>
+    <h1 class="mb-3 fs-4">股票交易管理</h1>
 
     {% with messages = get_flashed_messages(with_categories=true) %}
       {% if messages %}

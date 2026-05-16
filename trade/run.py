@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-股票交易录入服务 - 应用入口
+股票交易管理 - 应用入口
 """
 from app import create_app
 
