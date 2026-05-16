@@ -1,0 +1,58 @@
+[
+  {
+    "id": "guotai",
+    "name": "国泰君安",
+    "rate": 2.5,
+    "min_fee": 5,
+    "description": "万2.5, 最低5元"
+  },
+  {
+    "id": "huarun",
+    "name": "华泰证券",
+    "rate": 1.8,
+    "min_fee": 5,
+    "description": "万1.8, 最低5元"
+  },
+  {
+    "id": "zhongxin",
+    "name": "中信证券",
+    "rate": 1.5,
+    "min_fee": 5,
+    "description": "万1.5, 最低5元"
+  },
+  {
+    "id": "guangda",
+    "name": "光大证券",
+    "rate": 1.2,
+    "min_fee": 5,
+    "description": "万1.2, 最低5元"
+  },
+  {
+    "id": "yongtai",
+    "name": "甬兴证券",
+    "rate": 1.0,
+    "min_fee": 1,
+    "description": "万1.0, 最低1元"
+  },
+  {
+    "id": "zheshang",
+    "name": "浙商证券",
+    "rate": 0.854,
+    "min_fee": 1,
+    "description": "万0.854, 最低1元"
+  },
+  {
+    "id": "pingan",
+    "name": "平安证券",
+    "rate": 2.5,
+    "min_fee": 5,
+    "description": "万2.5, 最低5元"
+  },
+  {
+    "id": "citic",
+    "name": "中信建投",
+    "rate": 1.2,
+    "min_fee": 5,
+    "description": "万1.2, 最低5元"
+  }
+]

@@ -1,6 +1,15 @@
+import logging
 import os
 
 from flask import Flask, flash, redirect, render_template, request, url_for
+
+# 配置日志
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
+if not logger.handlers:
+    handler = logging.StreamHandler()
+    handler.setFormatter(logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s'))
+    logger.addHandler(handler)
 
 from trade_service import (
     add_trade_record,
@@ -9,13 +18,19 @@ from trade_service import (
     count_records,
     delete_trade_record,
     format_trade_time,
+    get_broker_by_id,
+    get_brokers,
     get_record_by_id,
     get_stock_info,
     get_stock_summary,
     init_database,
     query_records,
     update_trade_record,
+    DB_FILE,
 )
+
+import sqlite3
+import urllib.request
 
 app = Flask(__name__, template_folder='templates')
 app.secret_key = os.urandom(24)
@@ -85,6 +100,10 @@ def submit():
     record_id = request.form.get('record_id', '').strip()
     stock_code = request.form.get('stock_code', '').strip()
     stock_name = request.form.get('stock_name', '').strip()
+    asset_type = request.form.get('asset_type', 'stock').strip()
+    if asset_type not in ['stock', 'fund']:
+        asset_type = 'stock'
+    
     trade_type = request.form.get('trade_type', '').strip().lower()
     quantity = request.form.get('quantity', '').strip()
     trade_price = request.form.get('trade_price', '').strip()
@@ -183,6 +202,7 @@ def submit():
             new_id = add_trade_record(
                 stock_code=stock_code or None,
                 stock_name=stock_name,
+                asset_type=asset_type,
                 trade_type=trade_type,
                 quantity=int(quantity),
                 trade_price=trade_price_value,
@@ -397,7 +417,12 @@ def stock_search():
                     # 格式: 名称,类型,纯代码,完整代码,名称,...
                     # 如: 安诺其,11,300067,sz300067,安诺其,,安诺其,99,1,,,
                     found_stock_name = parts[0]  # 名称在第1个字段
+                    stock_type = parts[1]  # 类型：11=股票，12=基金
                     full_code = parts[3]  # 完整代码在第4个字段（如 sz300067）
+                    
+                    # 只处理股票（type=11），不处理基金（type=12）
+                    if stock_type != '11':
+                        continue
                     
                     # 去掉市场前缀获取纯代码
                     if full_code.startswith(('sh', 'sz')):
@@ -407,8 +432,28 @@ def stock_search():
                     
                     # 过滤有效的A股代码（6位数字）
                     if code.isdigit() and len(code) == 6:
-                        # 过滤指数（以000/399开头的通常是指数）
-                        if not (code.startswith('000') or code.startswith('399')):
+                        # A股代码范围：
+                        # 600xxx-603xxx: 上海主板
+                        # 688xxx: 科创板
+                        # 000xxx-001xxx: 深圳主板
+                        # 002xxx: 中小板
+                        # 300xxx: 创业板
+                        is_valid_a_stock = (
+                            code.startswith('600') or  # 上海主板
+                            code.startswith('601') or  # 上海主板
+                            code.startswith('603') or  # 上海主板
+                            code.startswith('688') or  # 科创板
+                            code.startswith('000') or  # 深圳主板
+                            code.startswith('001') or  # 深圳主板
+                            code.startswith('002') or  # 中小板
+                            code.startswith('003') or  # 深圳主板
+                            code.startswith('300')    # 创业板
+                        )
+                        
+                        # 过滤指数（000xxx开头的通常包含指数）
+                        is_index = code.startswith('000') and len(code) == 6
+                        
+                        if is_valid_a_stock and not is_index:
                             results.append({
                                 'stock_code': code,
                                 'stock_name': found_stock_name
@@ -417,6 +462,363 @@ def stock_search():
         return {'results': results}
     except Exception as e:
         return {'results': [], 'error': str(e)}
+
+
+@app.route('/api/brokers')
+def api_brokers():
+    """获取券商列表"""
+    brokers = get_brokers()
+    return {
+        'brokers': brokers,
+        'config_file': 'config/brokers.json'
+    }
+
+
+@app.route('/api/brokers/<broker_id>')
+def api_broker_by_id(broker_id):
+    """根据ID获取单个券商信息"""
+    broker = get_broker_by_id(broker_id)
+    if broker:
+        return broker
+    return {'error': '券商不存在'}, 404
+
+
+@app.route('/api/stock/minute')
+def api_stock_minute():
+    """获取股票分时数据或日K数据"""
+    stock_code = request.args.get('code', '').strip()
+    if not stock_code or len(stock_code) != 6:
+        return {'error': '请提供6位股票代码'}, 400
+    
+    try:
+        import urllib.request
+        import json
+        from datetime import datetime, timedelta
+        
+        # 新浪财经分时数据接口
+        if stock_code.startswith(('6', '9')):
+            sina_code = 'sh' + stock_code
+        else:
+            sina_code = 'sz' + stock_code
+        
+        # 获取当前时间
+        now = datetime.now()
+        current_hour = now.hour
+        
+        # 判断是否交易时间 (9:30-11:30, 13:00-15:00)
+        is_trading_time = (
+            (current_hour == 9 and now.minute >= 30) or
+            (current_hour == 10) or
+            (current_hour == 11 and now.minute <= 30) or
+            (current_hour == 13) or
+            (current_hour == 14 and now.minute < 50)
+        )
+        
+        # 如果是交易时间，优先获取分时数据
+        if is_trading_time:
+            # 分时数据URL (5分钟K线数据)
+            url = f'http://money.finance.sina.com.cn/quotes_service/api/json_v2.php/CN_MarketData.getKLineData?symbol={sina_code}&scale=5&ma=no&datalen=48'
+            
+            req = urllib.request.Request(url, headers={
+                'Referer': 'https://finance.sina.com.cn',
+                'User-Agent': 'Mozilla/5.0'
+            })
+            
+            try:
+                with urllib.request.urlopen(req, timeout=10) as response:
+                    data = response.read().decode('gbk')
+                
+                minute_data = json.loads(data)
+                
+                if minute_data and isinstance(minute_data, list) and len(minute_data) > 0:
+                    times = []
+                    prices = []
+                    
+                    for item in minute_data:
+                        if isinstance(item, dict):
+                            times.append(item.get('day', '')[:5])  # 取时间部分 HH:MM
+                            prices.append(float(item.get('close', 0)))
+                    
+                    stock_info = get_stock_info(stock_code)
+                    stock_name = stock_info.get('stock_name', stock_code) if stock_info else stock_code
+                    prev_close = stock_info.get('closing_price', 0) if stock_info else 0
+                    
+                    return {
+                        'code': stock_code,
+                        'name': stock_name,
+                        'type': 'minute',
+                        'prev_close': prev_close,
+                        'current_price': prices[-1] if prices else 0,
+                        'times': times,
+                        'prices': prices,
+                    }
+            except Exception as e:
+                logger.warning(f"获取分时数据失败，尝试获取日K: {e}")
+        
+        # 非交易时间或分时数据获取失败，获取日K数据
+        # 获取最近30个交易日的日K数据
+        daily_url = f'http://money.finance.sina.com.cn/quotes_service/api/json_v2.php/CN_MarketData.getKLineData?symbol={sina_code}&scale=240&ma=no&datalen=30'
+        
+        req = urllib.request.Request(daily_url, headers={
+            'Referer': 'https://finance.sina.com.cn',
+            'User-Agent': 'Mozilla/5.0'
+        })
+        
+        with urllib.request.urlopen(req, timeout=10) as response:
+            data = response.read().decode('gbk')
+        
+        daily_data = json.loads(data)
+        
+        if not daily_data or not isinstance(daily_data, list) or len(daily_data) == 0:
+            return {'error': '暂无K线数据'}, 404
+        
+        times = []
+        prices = []
+        volumes = []
+        
+        for item in daily_data:
+            if isinstance(item, dict):
+                day_str = item.get('day', '')
+                # 转换日期格式为 MM-DD
+                if len(day_str) >= 10:
+                    times.append(day_str[5:10])  # MM-DD
+                else:
+                    times.append(day_str[:5])
+                prices.append(float(item.get('close', 0)))
+                volumes.append(int(float(item.get('volume', 0)) / 100))  # 转换为万手
+        
+        # 获取当前股票信息
+        stock_info = get_stock_info(stock_code)
+        stock_name = stock_info.get('stock_name', stock_code) if stock_info else stock_code
+        prev_close = stock_info.get('closing_price', 0) if stock_info else 0
+        
+        # 获取最后一天的开高低收
+        last_day = daily_data[-1] if daily_data else {}
+        open_price = float(last_day.get('open', 0))
+        high_price = float(last_day.get('high', 0))
+        low_price = float(last_day.get('low', 0))
+        close_price = float(last_day.get('close', 0))
+        
+        return {
+            'code': stock_code,
+            'name': stock_name,
+            'type': 'daily',
+            'prev_close': prev_close or open_price,
+            'current_price': close_price,
+            'open': open_price,
+            'high': high_price,
+            'low': low_price,
+            'times': times,
+            'prices': prices,
+            'volumes': volumes,
+            'is_holiday': not is_trading_time,
+        }
+    except Exception as e:
+        logger.error(f"获取K线数据失败: {e}")
+        return {'error': str(e)}, 500
+
+
+@app.route('/api/stock/identify')
+def api_stock_identify():
+    """根据股票/基金代码识别资产类型（股票还是基金）"""
+    code = request.args.get('code', '').strip()
+    if not code or len(code) != 6:
+        return {'type': 'unknown'}
+    
+    try:
+        import urllib.request
+        import urllib.parse
+        
+        # 基金代码通常以 5 开头（如 510300 是沪深300ETF）
+        # A股股票代码范围：600-603, 688, 000-003, 002, 300
+        if code.startswith('5') or code.startswith('15'):
+            # 基金（ETF、LOF等）
+            return {'type': 'fund', 'code': code}
+        elif code.startswith(('6', '688', '000', '001', '002', '003', '300')):
+            return {'type': 'stock', 'code': code}
+        else:
+            return {'type': 'unknown'}
+    except Exception as e:
+        return {'type': 'unknown'}
+
+
+@app.route('/api/stock/realtime')
+def api_stock_realtime():
+    """获取股票实时行情（包含分时数据）"""
+    stock_code = request.args.get('code', '').strip()
+    if not stock_code or len(stock_code) != 6:
+        return {'error': '请提供6位股票代码'}, 400
+    
+    try:
+        import urllib.request
+        # 新浪财经实时行情接口
+        if stock_code.startswith(('6', '9')):
+            sina_code = 'sh' + stock_code
+        else:
+            sina_code = 'sz' + stock_code
+        
+        url = f'http://hq.sinajs.cn/list={sina_code}'
+        req = urllib.request.Request(url, headers={
+            'Referer': 'https://finance.sina.com.cn',
+            'User-Agent': 'Mozilla/5.0'
+        })
+        
+        with urllib.request.urlopen(req, timeout=5) as response:
+            data = response.read().decode('gbk')
+        
+        if not data or '=' not in data:
+            return {'error': '无法获取数据'}, 500
+        
+        parts = data.split('"')
+        if len(parts) < 2:
+            return {'error': '数据格式错误'}, 500
+        
+        values = parts[1].split(',')
+        if len(values) < 32:
+            return {'error': '数据不完整'}, 500
+        
+        stock_name = values[0]
+        open_price = float(values[1]) if values[1] else 0
+        prev_close = float(values[2]) if values[2] else 0
+        current_price = float(values[3]) if values[3] else 0
+        high_price = float(values[4]) if values[4] else 0
+        low_price = float(values[5]) if values[5] else 0
+        volume = int(values[8]) if values[8] else 0  # 成交量（手）
+        amount = float(values[9]) if values[9] else 0  # 成交额（元）
+        
+        # 计算涨跌幅
+        change = current_price - prev_close
+        change_pct = (change / prev_close * 100) if prev_close > 0 else 0
+        
+        return {
+            'code': stock_code,
+            'name': stock_name,
+            'open': open_price,
+            'prev_close': prev_close,
+            'current': current_price,
+            'high': high_price,
+            'low': low_price,
+            'volume': volume,
+            'amount': amount,
+            'change': round(change, 3),
+            'change_pct': round(change_pct, 2),
+            'time': values[30] + ' ' + values[31] if len(values) > 31 else ''
+        }
+    except Exception as e:
+        logger.error(f"获取实时行情失败: {e}")
+        return {'error': str(e)}, 500
+
+
+@app.route('/api/position/pnl')
+def api_position_pnl():
+    """获取指定股票的持仓盈亏数据"""
+    stock_code = request.args.get('stock_code', '').strip()
+    
+    if not stock_code:
+        return {'error': '股票代码不能为空', 'positions': []}, 400
+    
+    try:
+        # 获取该股票所有买入记录（按时间正序）
+        conn = sqlite3.connect(DB_FILE)
+        conn.row_factory = sqlite3.Row
+        buy_records = conn.execute('''
+            SELECT id, trade_time, quantity, trade_price, commission_fee
+            FROM trade_records
+            WHERE stock_code = ? AND trade_type = 'buy'
+            ORDER BY trade_time ASC
+        ''', (stock_code,)).fetchall()
+        
+        sell_records = conn.execute('''
+            SELECT id, trade_time, quantity, trade_price
+            FROM trade_records
+            WHERE stock_code = ? AND trade_type = 'sell'
+            ORDER BY trade_time ASC
+        ''', (stock_code,)).fetchall()
+        conn.close()
+        
+        # 获取实时价格
+        try:
+            realtime_url = f'http://hq.sinajs.cn/list=sh{stock_code},sz{stock_code}'
+            req = urllib.request.Request(realtime_url, headers={'Referer': 'https://finance.sina.com.cn'})
+            with urllib.request.urlopen(req, timeout=5) as response:
+                data = response.read().decode('gbk')
+                if '="ERROR"' in data or '="INVALID"' in data:
+                    current_price = 0
+                else:
+                    parts = data.split('="')[1].split(',')
+                    current_price = float(parts[3]) if len(parts) > 3 and parts[3] else 0
+        except Exception:
+            current_price = 0
+        
+        # 计算持仓和盈亏
+        positions = []
+        total_cost = 0
+        total_shares = 0
+        remaining_shares = 0
+        avg_cost = 0  # 初始化默认值
+        
+        for record in buy_records:
+            shares = record['quantity']
+            price = record['trade_price']
+            cost = shares * price + (record['commission_fee'] or 0)
+            avg_cost = cost / shares if shares > 0 else 0
+            total_cost += cost
+            total_shares += shares
+            
+            # 模拟计算：买入时盈亏为0
+            pnl = 0
+            pnl_rate = 0
+            
+            positions.append({
+                'trade_time': record['trade_time'],
+                'trade_type': 'buy',
+                'quantity': shares,
+                'cost_price': round(avg_cost, 3),
+                'current_price': current_price,
+                'pnl': round(pnl, 2),
+                'pnl_rate': round(pnl_rate, 2)
+            })
+            remaining_shares += shares
+        
+        # 计算卖出的影响
+        for record in sell_records:
+            shares = record['quantity']
+            price = record['trade_price']
+            
+            # 卖出时计算已实现盈亏
+            if total_shares > 0:
+                avg_cost = total_cost / total_shares
+                pnl = (price - avg_cost) * shares
+                pnl_rate = (price - avg_cost) / avg_cost * 100 if avg_cost > 0 else 0
+            else:
+                pnl = 0
+                pnl_rate = 0
+                avg_cost = 0
+            
+            total_cost -= shares * avg_cost
+            total_shares -= shares
+            remaining_shares -= shares
+            
+            positions.append({
+                'trade_time': record['trade_time'],
+                'trade_type': 'sell',
+                'quantity': shares,
+                'cost_price': round(avg_cost, 3),
+                'current_price': current_price,
+                'pnl': round(pnl, 2),
+                'pnl_rate': round(pnl_rate, 2)
+            })
+        
+        return {
+            'stock_code': stock_code,
+            'current_price': current_price,
+            'positions': positions,
+            'remaining_shares': remaining_shares
+        }
+        
+    except Exception as e:
+        logger.error(f"获取持仓盈亏失败: {e}")
+        return {'error': str(e), 'positions': []}, 500
 
 
 if __name__ == '__main__':

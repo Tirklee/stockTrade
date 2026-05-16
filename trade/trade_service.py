@@ -19,6 +19,69 @@ if not logger.handlers:
     console_handler.setFormatter(formatter)
     logger.addHandler(console_handler)
 
+# ====== 券商配置 ======
+
+# 默认券商列表（用户可编辑 config/brokers.json 文件修改）
+DEFAULT_BROKERS = [
+    {"id": "guotai", "name": "国泰君安", "rate": 2.5, "min_fee": 5, "description": "万2.5, 最低5元"},
+    {"id": "huarun", "name": "华泰证券", "rate": 1.8, "min_fee": 5, "description": "万1.8, 最低5元"},
+    {"id": "zhongxin", "name": "中信证券", "rate": 1.5, "min_fee": 5, "description": "万1.5, 最低5元"},
+    {"id": "guangda", "name": "光大证券", "rate": 1.2, "min_fee": 5, "description": "万1.2, 最低5元"},
+    {"id": "yongtai", "name": "甬兴证券", "rate": 1.0, "min_fee": 1, "description": "万1.0, 最低1元"},
+    {"id": "zheshang", "name": "浙商证券", "rate": 0.854, "min_fee": 1, "description": "万0.854, 最低1元"},
+    {"id": "pingan", "name": "平安证券", "rate": 2.5, "min_fee": 5, "description": "万2.5, 最低5元"},
+    {"id": "citic", "name": "中信建投", "rate": 1.2, "min_fee": 5, "description": "万1.2, 最低5元"},
+]
+
+BROKERS_CONFIG_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'config', 'brokers.json')
+
+def get_brokers() -> List[Dict]:
+    """获取券商列表，优先从配置文件读取，否则使用默认配置"""
+    try:
+        if os.path.exists(BROKERS_CONFIG_FILE):
+            with open(BROKERS_CONFIG_FILE, 'r', encoding='utf-8') as f:
+                brokers = json.load(f)
+                if brokers and isinstance(brokers, list):
+                    return brokers
+    except Exception as e:
+        logger.warning(f"读取券商配置文件失败: {e}")
+    
+    # 确保配置目录存在
+    config_dir = os.path.dirname(BROKERS_CONFIG_FILE)
+    if not os.path.exists(config_dir):
+        os.makedirs(config_dir)
+    
+    # 保存默认配置
+    try:
+        with open(BROKERS_CONFIG_FILE, 'w', encoding='utf-8') as f:
+            json.dump(DEFAULT_BROKERS, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        logger.warning(f"保存券商配置文件失败: {e}")
+    
+    return DEFAULT_BROKERS
+
+def save_brokers(brokers: List[Dict]) -> bool:
+    """保存券商配置"""
+    try:
+        config_dir = os.path.dirname(BROKERS_CONFIG_FILE)
+        if not os.path.exists(config_dir):
+            os.makedirs(config_dir)
+        
+        with open(BROKERS_CONFIG_FILE, 'w', encoding='utf-8') as f:
+            json.dump(brokers, f, ensure_ascii=False, indent=2)
+        return True
+    except Exception as e:
+        logger.error(f"保存券商配置失败: {e}")
+        return False
+
+def get_broker_by_id(broker_id: str) -> Optional[Dict]:
+    """根据ID获取券商信息"""
+    brokers = get_brokers()
+    for broker in brokers:
+        if broker.get('id') == broker_id:
+            return broker
+    return None
+
 # ====== 数据源可用性检测 ======
 
 # 1. baostock - 推荐主数据源（免费稳定，专为A股设计）
@@ -43,6 +106,7 @@ def init_database():
         trade_time TIMESTAMP NOT NULL,
         stock_code TEXT,
         stock_name TEXT NOT NULL,
+        asset_type TEXT NOT NULL DEFAULT 'stock',
         trade_type TEXT NOT NULL,
         quantity INTEGER NOT NULL,
         opening_price REAL,
@@ -67,6 +131,8 @@ def init_database():
         cursor.execute('ALTER TABLE trade_records ADD COLUMN high_price REAL')
     if 'low_price' not in existing_columns:
         cursor.execute('ALTER TABLE trade_records ADD COLUMN low_price REAL')
+    if 'asset_type' not in existing_columns:
+        cursor.execute('ALTER TABLE trade_records ADD COLUMN asset_type TEXT NOT NULL DEFAULT "stock"')
 
     conn.commit()
     conn.close()
@@ -101,6 +167,7 @@ def add_trade_record(
     low_price: Optional[float] = None,
     profit_loss: Optional[float] = None,
     profit_loss_reason: Optional[str] = None,
+    asset_type: str = 'stock',
 ) -> int:
     """添加交易记录"""
     if trade_time is None:
@@ -111,19 +178,24 @@ def add_trade_record(
     if trade_type.lower() not in ['buy', 'sell']:
         raise ValueError("trade_type must be 'buy' or 'sell'")
 
+    # 验证资产类型
+    if asset_type not in ['stock', 'fund']:
+        asset_type = 'stock'
+
     try:
         conn = sqlite3.connect(DB_FILE)
         cursor = conn.cursor()
         cursor.execute('''
             INSERT INTO trade_records
-            (trade_time, stock_code, stock_name, trade_type, quantity,
+            (trade_time, stock_code, stock_name, asset_type, trade_type, quantity,
              opening_price, closing_price, high_price, low_price, trade_price, commission_fee,
              profit_loss, profit_loss_reason, trade_basis)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             trade_time,
             stock_code.upper() if stock_code else None,
             stock_name,
+            asset_type,
             trade_type.lower(),
             quantity,
             opening_price,
@@ -169,17 +241,17 @@ def query_records(stock_code: Optional[str] = None, stock_name: Optional[str] = 
         conditions.append('stock_name LIKE ?')
         params.append(f'%{stock_name}%')
     
-    # 构建SQL
+    # 构建SQL - 使用安全的参数化查询
     where_clause = ''
     if conditions:
         where_clause = 'WHERE ' + ' AND '.join(conditions)
     
-    sql = f'''
+    sql = '''
         SELECT * FROM trade_records
         {where_clause}
         ORDER BY trade_time DESC
         LIMIT ? OFFSET ?
-    '''
+    '''.format(where_clause=where_clause)
     params.extend([per_page, offset])
     
     cursor.execute(sql, tuple(params))

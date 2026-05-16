@@ -1,0 +1,64 @@
+/* 表格排序样式 */
+th.sortable {
+    cursor: pointer;
+    user-select: none;
+}
+
+th.sortable .sort-indicator {
+    font-size: 0.8rem;
+    margin-left: 0.25rem;
+}
+
+/* 股票图表容器样式 */
+#stock_iframe_container {
+    background: #1a1a2e;
+    border-radius: 8px;
+    padding: 8px;
+}
+
+/* 股票图表样式 */
+.stock-charts-wrapper {
+    display: flex;
+    gap: 8px;
+    height: 100%;
+}
+
+.stock-chart-item {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+.chart-label {
+    color: #888;
+    font-size: 11px;
+    text-align: center;
+    margin-bottom: 4px;
+}
+
+.stock-chart-img {
+    width: 100%;
+    height: calc(100% - 20px);
+    object-fit: contain;
+    border-radius: 4px;
+}
+
+/* 搜索下拉框样式 */
+.dropdown-menu {
+    max-height: 200px;
+    overflow-y: auto;
+}
+
+.dropdown-item {
+    cursor: pointer;
+}
+
+.dropdown-item:hover {
+    background-color: #f8f9fa;
+}
+
+/* 盈亏按钮样式 */
+.pnl-btn {
+    cursor: pointer;
+}

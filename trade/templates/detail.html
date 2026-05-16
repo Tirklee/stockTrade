@@ -23,9 +23,10 @@
         <div class="card-body">
             <div class="row gy-2">
                 <div class="col-sm-6 col-lg-4"><strong>时间</strong><div>{{ record.trade_time }}</div></div>
+                <div class="col-sm-6 col-lg-4"><strong>资产类型</strong><div>{{ '股票' if record.asset_type == 'stock' else '基金' if record.asset_type == 'fund' else record.asset_type }}</div></div>
                 <div class="col-sm-6 col-lg-4"><strong>代码</strong><div>{{ record.stock_code or '' }}</div></div>
                 <div class="col-sm-6 col-lg-4"><strong>名称</strong><div>{{ record.stock_name }}</div></div>
-                <div class="col-sm-6 col-lg-4"><strong>类型</strong><div>{{ '买入' if record.trade_type == 'buy' else '卖出' if record.trade_type == 'sell' else record.trade_type }}</div></div>
+                <div class="col-sm-6 col-lg-4"><strong>交易方向</strong><div>{{ '买入' if record.trade_type == 'buy' else '卖出' if record.trade_type == 'sell' else record.trade_type }}</div></div>
                 <div class="col-sm-6 col-lg-4"><strong>股票</strong><div>{{ record.quantity }}</div></div>
                 <div class="col-sm-6 col-lg-4"><strong>价格</strong><div>{{ record.trade_price|decimal3 }}</div></div>
                 <div class="col-sm-6 col-lg-4"><strong>手续费</strong><div>{{ record.commission_fee|decimal3 }}</div></div>
