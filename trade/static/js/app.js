@@ -499,6 +499,8 @@ document.addEventListener('DOMContentLoaded', function () {
     const commissionRateInput = document.getElementById('commission_rate_input');
     const commissionFeeInput = document.getElementById('commission_fee_input');
     const brokerConfigHint = document.getElementById('broker_config_hint');
+    const tradeTypeSelect = document.getElementById('trade_type_input'); // 交易类型下拉框
+    const profitLossDisplay = document.getElementById('profit_loss_display'); // 盈亏显示区域
 
     // 动态加载券商列表
     let brokerConfig = {};
@@ -618,6 +620,150 @@ document.addEventListener('DOMContentLoaded', function () {
     } else {
         if (commissionRateInput) commissionRateInput.setAttribute('readonly', 'true');
     }
+
+    // ====== 实时盈亏计算功能 ======
+    let currentPosition = null;
+
+    async function loadCurrentPosition() {
+        if (!stockCodeInput) return null;
+        const stockCode = stockCodeInput.value.trim();
+        if (!stockCode || stockCode.length !== 6) {
+            currentPosition = null;
+            return null;
+        }
+
+        try {
+            const response = await fetch('/api/position/pnl?stock_code=' + encodeURIComponent(stockCode));
+            if (!response.ok) {
+                currentPosition = null;
+                return null;
+            }
+            const data = await response.json();
+            
+            if (data.positions && data.positions.length > 0) {
+                const buyPositions = data.positions.filter(p => p.trade_type === 'buy');
+                if (buyPositions.length > 0) {
+                    const totalQuantity = buyPositions.reduce((sum, p) => sum + p.quantity, 0);
+                    const totalCost = buyPositions.reduce((sum, p) => sum + (p.cost_price || 0) * p.quantity, 0);
+                    const avgCost = totalCost / totalQuantity;
+                    
+                    const sellPositions = data.positions.filter(p => p.trade_type === 'sell');
+                    const soldQuantity = sellPositions.reduce((sum, p) => sum + p.quantity, 0);
+                    
+                    currentPosition = {
+                        avgCost: avgCost,
+                        totalQuantity: totalQuantity,
+                        soldQuantity: soldQuantity,
+                        remainingQuantity: totalQuantity - soldQuantity
+                    };
+                    return currentPosition;
+                }
+            }
+            
+            currentPosition = null;
+            return null;
+        } catch (error) {
+            console.warn('加载持仓信息失败:', error);
+            currentPosition = null;
+            return null;
+        }
+    }
+
+    async function calculateProfitLoss() {
+        const profitLossDisplay = document.getElementById('profit_loss_display');
+        if (!profitLossDisplay) return;
+        
+        const tradeType = tradeTypeSelect ? tradeTypeSelect.value : '';
+        const quantity = parseInt(quantityInput ? quantityInput.value : '0', 10);
+        const price = parseFloat(tradePriceInput ? tradePriceInput.value : '0');
+        
+        if (tradeType !== 'sell') {
+            profitLossDisplay.innerHTML = '<span class="text-muted">仅卖出时可计算盈亏</span>';
+            return;
+        }
+        
+        if (quantity <= 0 || price <= 0) {
+            profitLossDisplay.innerHTML = '<span class="text-muted">请输入卖出数量和价格</span>';
+            return;
+        }
+        
+        if (!currentPosition || currentPosition.remainingQuantity <= 0) {
+            profitLossDisplay.innerHTML = '<span class="text-warning">该股票暂无持仓</span>';
+            return;
+        }
+        
+        const costPrice = currentPosition.avgCost;
+        const profitLoss = (price - costPrice) * quantity;
+        const profitLossRate = costPrice > 0 ? (profitLoss / (costPrice * quantity) * 100) : 0;
+        
+        const isProfit = profitLoss >= 0;
+        const pnlClass = isProfit ? 'text-danger' : 'text-success';
+        const pnlSign = isProfit ? '+' : '';
+        
+        profitLossDisplay.innerHTML = '<div class="d-flex align-items-center gap-3"><div><small class="text-muted">成本价</small><div class="fw-bold">' + costPrice.toFixed(3) + '</div></div><div><small class="text-muted">卖出数量</small><div class="fw-bold">' + quantity + '</div></div><div><small class="text-muted">盈亏金额</small><div class="fw-bold ' + pnlClass + '">' + pnlSign + '¥' + profitLoss.toFixed(2) + '</div></div><div><small class="text-muted">盈亏比例</small><div class="fw-bold ' + pnlClass + '">' + pnlSign + profitLossRate.toFixed(2) + '%</div></div></div>';
+    }
+
+    if (stockCodeInput) {
+        stockCodeInput.addEventListener('input', debounce(async function() {
+            const code = stockCodeInput.value.trim();
+            if (code.length === 6 && /^\d{6}$/.test(code)) {
+                await loadCurrentPosition();
+                calculateProfitLoss();
+            } else {
+                currentPosition = null;
+                const profitLossDisplay = document.getElementById('profit_loss_display');
+                if (profitLossDisplay) profitLossDisplay.innerHTML = '<span class="text-muted">请先选择股票</span>';
+            }
+        }, 500));
+        
+        stockCodeInput.addEventListener('blur', debounce(async function() {
+            const code = stockCodeInput.value.trim();
+            if (code.length === 6 && /^\d{6}$/.test(code)) {
+                await loadCurrentPosition();
+                calculateProfitLoss();
+            }
+        }, 200));
+    }
+
+    if (stockSearchResults) {
+        const observer = new MutationObserver(function(mutations) {
+            mutations.forEach(function(mutation) {
+                if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
+                    mutation.addedNodes.forEach(function(node) {
+                        if (node.classList && node.classList.contains('dropdown-item')) {
+                            node.addEventListener('click', async function() {
+                                setTimeout(async function() {
+                                    await loadCurrentPosition();
+                                    calculateProfitLoss();
+                                }, 300);
+                            });
+                        }
+                    });
+                }
+            });
+        });
+        observer.observe(stockSearchResults, { childList: true });
+    }
+
+    if (tradeTypeSelect) {
+        tradeTypeSelect.addEventListener('change', function() {
+            loadCurrentPosition().then(function() {
+                calculateProfitLoss();
+            });
+        });
+    }
+
+    if (quantityInput) {
+        quantityInput.addEventListener('input', calculateProfitLoss);
+    }
+
+    if (tradePriceInput) {
+        tradePriceInput.addEventListener('input', calculateProfitLoss);
+    }
+
+    loadCurrentPosition().then(function() {
+        calculateProfitLoss();
+    });
 
     // ====== 辅助函数 ======
     // 计算移动平均线
