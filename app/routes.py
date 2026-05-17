@@ -33,11 +33,14 @@ def index():
             brokers = json.load(f)
     
     return render_template('index.html', 
-                         trades=trades,
-                         page=page,
-                         per_page=per_page,
-                         total=total,
-                         brokers=brokers)
+                         records=trades,
+                         current_page=page,
+                         current_per_page=per_page,
+                         total_pages=(total + per_page - 1) // per_page if per_page > 0 else 0,
+                         total_records=total,
+                         brokers=brokers,
+                         stock_code=stock_code,
+                         stock_name=request.args.get('stock_name', ''))
 
 @main_bp.route('/submit', methods=['POST'])
 def submit():
