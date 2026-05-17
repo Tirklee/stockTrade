@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>新增股票信息</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap.min.css') }}" />
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/custom.css') }}" />
+</head>
+<body>
+<div class="container-fluid py-3">
+    <h1 class="mb-3 fs-4">新增股票信息</h1>
+    
+    <div class="row gx-3">
+        <div class="col-xl-12">
+            <div class="card mb-3">
+                <div class="card-body">
+                    <form id="addForm">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label class="form-label">股票代码</label>
+                                <input type="text" class="form-control" id="stock_code" name="stock_code" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">股票名称</label>
+                                <input type="text" class="form-control" id="stock_name" name="stock_name" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">交易类型</label>
+                                <select class="form-select" id="trade_type" name="trade_type" required>
+                                    <option value="">请选择</option>
+                                    <option value="buy">买入</option>
+                                    <option value="sell">卖出</option>
+                                </select>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">数量</label>
+                                <input type="number" class="form-control" id="quantity" name="quantity" min="1" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">交易价格</label>
+                                <input type="number" class="form-control" id="trade_price" name="trade_price" step="0.001" min="0" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="form-label">手续费</label>
+                                <input type="number" class="form-control" id="commission_fee" name="commission_fee" step="0.001" min="0" value="0">
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label">交易依据</label>
+                                <textarea class="form-control" id="trade_basis" name="trade_basis" rows="3" required></textarea>
+                            </div>
+                            <div class="col-12">
+                                <button type="submit" class="btn btn-primary">提交</button>
+                                <a href="{{ url_for('main.index') }}" class="btn btn-secondary">返回</a>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
+<script>
+    document.getElementById('addForm').addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        // 收集表单数据
+        const formData = new FormData(this);
+        const data = {};
+        for (const [key, value] of formData.entries()) {
+            data[key] = value;
+        }
+        
+        // 发送请求
+        fetch('/submit', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(data)
+        })
+        .then(response => response.json())
+        .then(result => {
+            if (result.success) {
+                alert('添加成功');
+                window.location.href = '/'; // 跳转到主页
+            } else {
+                alert('添加失败: ' + result.message);
+            }
+        })
+        .catch(error => {
+            console.error('Error:', error);
+            alert('添加失败: ' + error.message);
+        });
+    });
+</script>
+</body>
+</html>

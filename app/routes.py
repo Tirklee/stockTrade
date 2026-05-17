@@ -30,7 +30,7 @@ def index():
     brokers = []
     if os.path.exists(broker_config_path):
         with open(broker_config_path, 'r', encoding='utf-8') as f:
-            brokers = json.load(f).get('brokers', [])
+            brokers = json.load(f)
     
     return render_template('index.html', 
                          trades=trades,
@@ -70,7 +70,7 @@ def edit(trade_id):
     brokers = []
     if os.path.exists(broker_config_path):
         with open(broker_config_path, 'r', encoding='utf-8') as f:
-            brokers = json.load(f).get('brokers', [])
+            brokers = json.load(f)
     
     return render_template('detail.html', trade=trade, edit=True, brokers=brokers)
 
@@ -154,10 +154,10 @@ def sell_stock():
     return jsonify({'success': success, 'message': message, 'trade_id': trade_id})
 
 @main_bp.route('/api/brokers')
-def brokers():
+def get_brokers_list():
     """获取券商列表"""
     broker_config_path = os.path.join(os.path.dirname(__file__), '..', 'config', 'brokers.json')
     if os.path.exists(broker_config_path):
         with open(broker_config_path, 'r', encoding='utf-8') as f:
-            return jsonify(json.load(f).get('brokers', []))
+            return jsonify(json.load(f))
     return jsonify([])

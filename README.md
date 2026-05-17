@@ -13,38 +13,47 @@
 - ✅ 股票K线图表展示
 - ✅ 表格排序和分页
 - ✅ 数据导出
+- ✅ 单元测试支持
 
 ## 项目结构
 
 ```
-trade/
-├── app/                    # 应用主模块
-│   ├── __init__.py        # Flask应用工厂
-│   ├── routes.py          # 路由定义
-│   ├── models/            # 数据模型
+stockTrade/                     # 项目根目录
+├── app/                        # 应用主模块
+│   ├── __init__.py           # Flask应用工厂
+│   ├── config.py              # 配置管理模块
+│   ├── database.py            # 数据库管理模块
+│   ├── logging_config.py      # 日志配置模块
+│   ├── routes.py              # 路由定义
+│   ├── models/                # 数据模型目录
 │   │   └── __init__.py
-│   ├── services/          # 服务层
-│   │   ├── __init__.py
+│   ├── services/              # 服务层目录
 │   │   ├── trade_service.py   # 交易记录服务
-│   │   └── stock_service.py   # 股票数据服务
-│   └── utils/             # 工具函数
+│   │   └── stock_service.py  # 股票数据服务
+│   └── utils/                 # 工具函数目录
 │       └── __init__.py
-├── config/                 # 配置目录
-│   └── brokers.json       # 券商佣金配置
-├── static/                # 静态资源
+├── config/                     # 配置目录
+│   └── brokers.json          # 券商佣金配置
+├── static/                    # 静态资源目录
 │   ├── css/
-│   │   └── custom.css     # 自定义样式
+│   │   ├── bootstrap.min.css  # Bootstrap CSS
+│   │   └── custom.css         # 自定义样式
 │   └── js/
-│       └── app.js         # 前端脚本
-├── templates/             # HTML模板
-│   ├── index.html
-│   └── detail.html
-├── config.py             # 配置文件
-├── requirements.txt      # Python依赖
-├── run.py               # 应用入口
-├── trade_service.py     # 交易服务（原文件，保留兼容）
-├── web_app.py           # Web应用（原文件，保留兼容）
-└── stock_trades.db      # SQLite数据库
+│       ├── bootstrap.bundle.min.js  # Bootstrap JS
+│       ├── app.js             # 应用JavaScript
+│       └── echarts.min.js     # ECharts图表库
+├── templates/                # HTML模板目录
+│   ├── index.html            # 首页模板
+│   ├── detail.html           # 详情页模板
+│   └── add.html              # 添加记录模板
+├── tests/                    # 测试目录
+│   ├── __init__.py
+│   ├── conftest.py           # pytest配置和fixtures
+│   └── test_trade_service.py # 交易服务单元测试
+├── init_project.py           # 项目初始化脚本
+├── run.py                    # 应用入口文件
+├── requirements.txt          # Python依赖清单
+└── stock_trades.db           # SQLite数据库
 ```
 
 ## 快速开始
@@ -52,11 +61,16 @@ trade/
 ### 1. 安装依赖
 
 ```bash
-cd trade
 pip install -r requirements.txt
 ```
 
-### 2. 配置券商佣金
+### 2. 初始化项目（可选）
+
+```bash
+python init_project.py
+```
+
+### 3. 配置券商佣金
 
 编辑 `config/brokers.json` 文件：
 
@@ -66,16 +80,10 @@ pip install -r requirements.txt
 ]
 ```
 
-### 3. 启动服务
+### 4. 启动服务
 
 ```bash
 python run.py
-```
-
-或使用原有入口：
-
-```bash
-python web_app.py
 ```
 
 服务启动后访问 http://127.0.0.1:5000
@@ -119,7 +127,7 @@ CREATE TABLE trade_records (
     trade_time TIMESTAMP NOT NULL,
     stock_code TEXT,
     stock_name TEXT NOT NULL,
-    asset_type TEXT DEFAULT 'stock',
+    asset_type TEXT NOT NULL DEFAULT 'stock',
     trade_type TEXT NOT NULL,
     quantity INTEGER NOT NULL,
     opening_price REAL,
@@ -127,7 +135,7 @@ CREATE TABLE trade_records (
     high_price REAL,
     low_price REAL,
     trade_price REAL NOT NULL,
-    commission_fee REAL DEFAULT 0,
+    commission_fee REAL NOT NULL DEFAULT 0,
     profit_loss REAL,
     profit_loss_reason TEXT,
     trade_basis TEXT NOT NULL,
@@ -136,12 +144,26 @@ CREATE TABLE trade_records (
 );
 ```
 
+### 数据库索引
+
+```sql
+CREATE INDEX idx_stock_code ON trade_records(stock_code);
+CREATE INDEX idx_trade_time ON trade_records(trade_time);
+CREATE INDEX idx_trade_type ON trade_records(trade_type);
+```
+
 ## 技术栈
 
-- **后端**: Flask, SQLite
-- **前端**: Bootstrap 5, Vanilla JavaScript
+- **后端**: Flask 2.0+, SQLite
+- **前端**: Bootstrap 5, Vanilla JavaScript, ECharts
 - **数据源**: Baostock, 新浪财经API
-- **图表**: Sina Finance K线图
+- **测试**: pytest
+
+## 运行测试
+
+```bash
+pytest tests/ -v
+```
 
 ## License
 
