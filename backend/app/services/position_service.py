@@ -1,0 +1,166 @@
+# -*- coding: utf-8 -*-
+"""
+持仓管理服务
+"""
+from datetime import datetime
+from decimal import Decimal
+from app import db
+from app.models import Position, TradeRecord
+
+
+class PositionService:
+    """持仓服务类"""
+
+    @staticmethod
+    def get_or_create_position(stock_code, stock_name, asset_type='stock'):
+        """获取或创建持仓记录"""
+        position = Position.query.filter_by(stock_code=stock_code).first()
+
+        if not position:
+            position = Position(
+                stock_code=stock_code,
+                stock_name=stock_name,
+                asset_type=asset_type,
+                total_quantity=0,
+                available_quantity=0,
+                frozen_quantity=0,
+                avg_cost=Decimal('0'),
+                total_cost=Decimal('0'),
+                current_price=Decimal('0'),
+                current_value=Decimal('0'),
+                unrealized_pnl=Decimal('0'),
+                unrealized_pnl_rate=Decimal('0')
+            )
+            db.session.add(position)
+            db.session.flush()
+
+        return position
+
+    @staticmethod
+    def update_position_after_buy(position, quantity, unit_price, commission_fee):
+        """买入后更新持仓"""
+        # 计算新的平均成本
+        total_cost = quantity * unit_price + commission_fee
+
+        if position.total_quantity == 0:
+            # 首次买入
+            position.total_quantity = quantity
+            position.available_quantity = quantity
+            position.avg_cost = Decimal(str(unit_price))
+            position.total_cost = Decimal(str(total_cost))
+        else:
+            # 追加买入
+            old_cost = float(position.total_cost)
+            new_cost = total_cost
+            total_new_cost = old_cost + new_cost
+            total_new_qty = position.total_quantity + quantity
+
+            position.total_quantity = total_new_qty
+            position.available_quantity = total_new_qty
+            position.avg_cost = Decimal(str(total_new_cost / total_new_qty))
+            position.total_cost = Decimal(str(total_new_cost))
+
+        position.updated_at = datetime.now()
+        return position
+
+    @staticmethod
+    def update_position_after_sell(position, quantity, avg_cost_from_sold, commission_fee):
+        """卖出后更新持仓"""
+        position.total_quantity -= quantity
+        position.available_quantity -= quantity
+
+        # 计算成本变化
+        sold_cost = avg_cost_from_sold * quantity
+        position.total_cost = Decimal(str(float(position.total_cost) - sold_cost))
+
+        # 重新计算平均成本
+        if position.total_quantity > 0:
+            position.avg_cost = position.total_cost / position.total_quantity
+        else:
+            position.avg_cost = Decimal('0')
+            position.total_cost = Decimal('0')
+
+        position.updated_at = datetime.now()
+        return position
+
+    @staticmethod
+    def update_position_pnl(position, current_price):
+        """更新持仓盈亏"""
+        if position.total_quantity > 0 and current_price:
+            position.current_price = Decimal(str(current_price))
+            position.current_value = Decimal(str(position.total_quantity * current_price))
+            position.unrealized_pnl = position.current_value - position.total_cost
+
+            if position.total_cost > 0:
+                position.unrealized_pnl_rate = (position.unrealized_pnl / position.total_cost) * 100
+            else:
+                position.unrealized_pnl_rate = Decimal('0')
+        else:
+            position.current_price = Decimal('0')
+            position.current_value = Decimal('0')
+            position.unrealized_pnl = Decimal('0')
+            position.unrealized_pnl_rate = Decimal('0')
+
+        position.updated_at = datetime.now()
+        return position
+
+    @staticmethod
+    def get_all_positions():
+        """获取所有持仓"""
+        positions = Position.query.filter(Position.total_quantity > 0).order_by(
+            Position.unrealized_pnl_rate.desc()
+        ).all()
+        return [p.to_dict() for p in positions]
+
+    @staticmethod
+    def get_position_by_code(stock_code):
+        """根据股票代码获取持仓"""
+        position = Position.query.filter_by(stock_code=stock_code).first()
+        return position.to_dict() if position else None
+
+    @staticmethod
+    def get_position_cost_detail(stock_code):
+        """获取持仓成本明细"""
+        trades = TradeRecord.query.filter_by(
+            stock_code=stock_code,
+            trade_type='buy'
+        ).order_by(TradeRecord.trade_time.asc()).all()
+
+        cost_records = []
+        remaining_qty = 0
+
+        for trade in trades:
+            if trade.position:
+                remaining_qty += trade.quantity
+
+            cost_records.append({
+                'trade_id': trade.id,
+                'trade_time': trade.trade_time.strftime('%Y-%m-%d %H:%M:%S'),
+                'quantity': trade.quantity,
+                'unit_price': float(trade.unit_price),
+                'total_amount': float(trade.total_amount),
+                'commission': float(trade.commission),
+                'cost_amount': float(trade.total_amount + trade.commission)
+            })
+
+        return cost_records
+
+    @staticmethod
+    def get_portfolio_summary():
+        """获取组合总览"""
+        positions = Position.query.filter(Position.total_quantity > 0).all()
+
+        total_market_value = sum(float(p.current_value or 0) for p in positions)
+        total_cost = sum(float(p.total_cost or 0) for p in positions)
+        total_pnl = total_market_value - total_cost
+        pnl_rate = (total_pnl / total_cost * 100) if total_cost > 0 else 0
+        stock_count = len(positions)
+
+        return {
+            'total_market_value': round(total_market_value, 2),
+            'total_cost': round(total_cost, 2),
+            'total_pnl': round(total_pnl, 2),
+            'pnl_rate': round(pnl_rate, 2),
+            'stock_count': stock_count,
+            'update_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        }
