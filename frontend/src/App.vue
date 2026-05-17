@@ -166,11 +166,13 @@ watch(() => route.path, () => {
 }
 
 .sidebar {
-  background-color: #304156;
+  background-color: #ffffff;
+  border-right: 1px solid #e4e7ed;
   transition: width 0.3s;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  box-shadow: 2px 0 8px 0 rgba(29, 35, 41, 0.05);
 }
 
 .logo {
@@ -178,11 +180,13 @@ watch(() => route.path, () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
-  font-size: 16px;
+  color: #409eff;
+  font-size: 18px;
   font-weight: bold;
-  background-color: #263445;
+  background-color: #409eff;
+  color: #fff;
   padding: 0 10px;
+  letter-spacing: 2px;
 }
 
 .logo img {
@@ -199,10 +203,48 @@ watch(() => route.path, () => {
   flex: 1;
   border-right: none;
   background-color: transparent;
+  --el-menu-bg-color: #ffffff;
+  --el-menu-text-color: #303133;
+  --el-menu-hover-bg-color: #ecf5ff;
+  --el-menu-active-color: #409eff;
+  --el-menu-hover-text-color: #409eff;
 }
 
 .sidebar-menu:not(.el-menu--collapse) {
   width: 200px;
+}
+
+/* 菜单项样式 */
+.sidebar-menu .el-menu-item {
+  height: 56px;
+  line-height: 56px;
+  margin: 4px 8px;
+  border-radius: 8px;
+}
+
+.sidebar-menu .el-menu-item:hover {
+  background-color: #ecf5ff;
+}
+
+.sidebar-menu .el-menu-item.is-active {
+  background-color: #409eff;
+  color: #fff;
+}
+
+.sidebar-menu .el-menu-item.is-active .el-icon {
+  color: #fff;
+}
+
+/* 子菜单样式 */
+.sidebar-menu .el-sub-menu__title {
+  height: 56px;
+  line-height: 56px;
+  margin: 4px 8px;
+  border-radius: 8px;
+}
+
+.sidebar-menu .el-sub-menu__title:hover {
+  background-color: #ecf5ff;
 }
 
 .collapse-btn {
@@ -210,14 +252,16 @@ watch(() => route.path, () => {
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #fff;
+  color: #909399;
   cursor: pointer;
-  background-color: #263445;
-  border-top: 1px solid #3d4a5a;
+  background-color: #fafafa;
+  border-top: 1px solid #e4e7ed;
+  transition: all 0.3s;
 }
 
 .collapse-btn:hover {
-  background-color: #3d4a5a;
+  background-color: #ecf5ff;
+  color: #409eff;
 }
 
 .header {
