@@ -11,6 +11,7 @@ export const usePortfolioStore = defineStore('portfolio', {
       stock_count: 0
     },
     positions: [],
+    total: 0,
     loading: false
   }),
 
@@ -30,12 +31,13 @@ export const usePortfolioStore = defineStore('portfolio', {
       }
     },
 
-    async fetchPositions() {
+    async fetchPositions(page = 1, per_page = 20) {
       this.loading = true
       try {
-        const res = await getPositions()
+        const res = await getPositions({ page, per_page })
         if (res.code === 0) {
-          this.positions = res.data
+          this.positions = res.data.data || []
+          this.total = res.data.total || 0
         }
       } catch (error) {
         console.error('获取持仓失败:', error)

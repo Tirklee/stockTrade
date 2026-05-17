@@ -17,9 +17,14 @@
             万{{ row.buy_commission_rate }}
           </template>
         </el-table-column>
+        <el-table-column label="卖出佣金" width="120" align="right">
+          <template #default="{ row }">
+            万{{ row.sell_commission_rate }}
+          </template>
+        </el-table-column>
         <el-table-column label="最低佣金" width="120" align="right">
           <template #default="{ row }">
-            ¥{{ row.min_commission }}
+            ¥{{ row.buy_min_commission }}
           </template>
         </el-table-column>
         <el-table-column label="状态" width="80">
@@ -58,8 +63,12 @@
         <el-form-item label="卖出佣金率" prop="sell_commission_rate">
           <el-input-number v-model="form.sell_commission_rate" :min="0.1" :max="10" :precision="2" />
         </el-form-item>
-        <el-form-item label="最低佣金" prop="min_commission">
-          <el-input-number v-model="form.min_commission" :min="0" :precision="2" />
+        <el-form-item label="最低佣金(买)" prop="buy_min_commission">
+          <el-input-number v-model="form.buy_min_commission" :min="0" :precision="2" />
+          <span class="form-tip">（元）</span>
+        </el-form-item>
+        <el-form-item label="最低佣金(卖)" prop="sell_min_commission">
+          <el-input-number v-model="form.sell_min_commission" :min="0" :precision="2" />
           <span class="form-tip">（元）</span>
         </el-form-item>
         <el-form-item label="状态" prop="is_active">
@@ -94,7 +103,8 @@ const form = ref({
   description: '',
   buy_commission_rate: 2.5,
   sell_commission_rate: 2.5,
-  min_commission: 5.0,
+  buy_min_commission: 5.0,
+  sell_min_commission: 5.0,
   is_active: true
 })
 
@@ -126,7 +136,8 @@ const showAddDialog = () => {
     description: '',
     buy_commission_rate: 2.5,
     sell_commission_rate: 2.5,
-    min_commission: 5.0,
+    buy_min_commission: 5.0,
+    sell_min_commission: 5.0,
     is_active: true
   }
   dialogVisible.value = true

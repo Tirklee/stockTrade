@@ -65,6 +65,7 @@
       :stock-code="selectedStock?.stock_code || ''"
       :stock-name="selectedStock?.stock_name || ''"
       :current-price="selectedStock?.current_price || 0"
+      :asset-type="selectedStock?.asset_type || 'stock'"
       @success="handleTradeSuccess"
     />
   </div>

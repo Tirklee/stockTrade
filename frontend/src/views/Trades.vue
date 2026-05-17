@@ -27,6 +27,11 @@
         <el-table-column prop="trade_time" label="交易时间" width="160" sortable />
         <el-table-column prop="stock_code" label="代码" width="100" />
         <el-table-column prop="stock_name" label="名称" width="120" />
+        <el-table-column label="类型" width="80">
+          <template #default="{ row }">
+            {{ row.asset_type === 'fund' ? '基金' : '股票' }}
+          </template>
+        </el-table-column>
         <el-table-column label="方向" width="80">
           <template #default="{ row }">
             <el-tag :type="row.trade_type === 'buy' ? 'success' : 'danger'" size="small">
@@ -73,7 +78,14 @@
         style="margin-top: 20px"
         @size-change="loadTrades"
         @current-change="loadTrades"
-      />
+      >
+        <template #first>
+          <span class="page-btn" @click="goFirst">首页</span>
+        </template>
+        <template #last>
+          <span class="page-btn" @click="goLast">末页</span>
+        </template>
+      </el-pagination>
 
       <el-empty v-if="!loading && trades.length === 0" description="暂无交易记录" />
     </el-card>
@@ -92,6 +104,16 @@ const total = ref(0)
 const filterTradeType = ref('')
 const dateRange = ref([])
 
+const goFirst = () => {
+  currentPage.value = 1
+  loadTrades()
+}
+
+const goLast = () => {
+  currentPage.value = Math.ceil(total.value / pageSize.value)
+  loadTrades()
+}
+
 const formatMoney = (num) => {
   if (num == null) return '--'
   return typeof num === 'number' ? num.toFixed(2) : num
@@ -109,6 +131,11 @@ const loadTrades = async () => {
       params.trade_type = filterTradeType.value
     }
 
+    if (dateRange.value && dateRange.value.length === 2) {
+      params.start_date = dateRange.value[0].toISOString().split('T')[0]
+      params.end_date = dateRange.value[1].toISOString().split('T')[0]
+    }
+
     const res = await getTrades(params)
     if (res.code === 0) {
       trades.value = res.data.data || []
@@ -121,7 +148,7 @@ const loadTrades = async () => {
   }
 }
 
-watch(filterTradeType, () => {
+watch([filterTradeType, dateRange], () => {
   currentPage.value = 1
   loadTrades()
 })
@@ -141,5 +168,10 @@ onMounted(() => {
 .header-actions {
   display: flex;
   align-items: center;
+}
+
+.page-btn {
+  cursor: pointer;
+  color: var(--el-color-primary);
 }
 </style>

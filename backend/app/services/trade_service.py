@@ -230,7 +230,8 @@ class TradeService:
             }
 
     @staticmethod
-    def get_trade_records(stock_code=None, trade_type=None, page=1, per_page=20):
+    def get_trade_records(stock_code=None, trade_type=None, page=1, per_page=20,
+                          start_date=None, end_date=None):
         """获取交易记录"""
         query = TradeRecord.query
 
@@ -239,6 +240,12 @@ class TradeService:
 
         if trade_type:
             query = query.filter(TradeRecord.trade_type == trade_type)
+
+        if start_date:
+            query = query.filter(TradeRecord.trade_time >= start_date)
+
+        if end_date:
+            query = query.filter(TradeRecord.trade_time <= end_date)
 
         # 分页
         total = query.count()

@@ -105,12 +105,21 @@ class PositionService:
         return position
 
     @staticmethod
-    def get_all_positions():
-        """获取所有持仓"""
-        positions = Position.query.filter(Position.total_quantity > 0).order_by(
-            Position.unrealized_pnl_rate.desc()
-        ).all()
-        return [p.to_dict() for p in positions]
+    def get_all_positions(page=1, per_page=20):
+        """获取所有持仓（分页）"""
+        query = Position.query.filter(Position.total_quantity > 0)
+
+        total = query.count()
+        positions = query.order_by(Position.unrealized_pnl_rate.desc()).offset(
+            (page - 1) * per_page
+        ).limit(per_page).all()
+
+        return {
+            'total': total,
+            'page': page,
+            'per_page': per_page,
+            'data': [p.to_dict() for p in positions]
+        }
 
     @staticmethod
     def get_position_by_code(stock_code):

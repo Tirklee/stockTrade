@@ -42,7 +42,8 @@ class Broker(db.Model):
             'description': self.description,
             'buy_commission_rate': float(self.buy_commission_rate),
             'sell_commission_rate': float(self.sell_commission_rate),
-            'min_commission': float(self.buy_min_commission),
+            'buy_min_commission': float(self.buy_min_commission),
+            'sell_min_commission': float(self.sell_min_commission),
             'stamp_tax_rate': float(self.stamp_tax_rate),
             'is_active': self.is_active
         }

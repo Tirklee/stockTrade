@@ -86,17 +86,14 @@ def get_positions():
     stock_code = request.args.get('stock_code')
     sort_by = request.args.get('sort_by', 'unrealized_pnl_rate')
     order = request.args.get('order', 'desc')
+    page = request.args.get('page', 1, type=int)
+    per_page = request.args.get('per_page', 20, type=int)
 
-    positions = PositionService.get_all_positions()
-
-    # 排序
-    if sort_by:
-        reverse = order == 'desc'
-        positions = sorted(positions, key=lambda x: x.get(sort_by, 0), reverse=reverse)
+    result = PositionService.get_all_positions(page=page, per_page=per_page)
 
     return jsonify({
         'code': 0,
-        'data': positions
+        'data': result
     })
 
 
@@ -237,12 +234,16 @@ def get_trades():
     trade_type = request.args.get('trade_type')
     page = request.args.get('page', 1, type=int)
     per_page = request.args.get('per_page', 20, type=int)
+    start_date = request.args.get('start_date')
+    end_date = request.args.get('end_date')
 
     result = TradeService.get_trade_records(
         stock_code=stock_code,
         trade_type=trade_type,
         page=page,
-        per_page=per_page
+        per_page=per_page,
+        start_date=start_date,
+        end_date=end_date
     )
 
     return jsonify({

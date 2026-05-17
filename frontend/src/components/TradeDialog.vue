@@ -93,6 +93,10 @@ const props = defineProps({
   stockCode: String,
   stockName: String,
   currentPrice: Number,
+  assetType: {
+    type: String,
+    default: 'stock'
+  },
   availableQuantity: {
     type: Number,
     default: 999999
@@ -187,6 +191,7 @@ const handleSubmit = async () => {
     const data = {
       stock_code: form.value.stock_code,
       stock_name: form.value.stock_name,
+      asset_type: props.assetType,
       quantity: form.value.quantity,
       unit_price: form.value.unit_price,
       broker_id: form.value.broker_id,

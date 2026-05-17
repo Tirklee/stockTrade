@@ -108,6 +108,7 @@
       :stock-code="stockCode"
       :stock-name="stockData.stock_name"
       :current-price="stockData.current_price"
+      :asset-type="stockData.asset_type || 'stock'"
       :available-quantity="positionData?.available_quantity || 999999"
       @success="handleTradeSuccess"
     />
@@ -117,7 +118,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { getStockRealtime, getStockKline, getPosition } from '../api'
+import { getStockRealtime, getStockKline, getPosition, identifyStockType } from '../api'
 import TradeDialog from '../components/TradeDialog.vue'
 import * as echarts from 'echarts'
 
@@ -165,6 +166,10 @@ const loadRealtime = async () => {
     const res = await getStockRealtime(stockCode.value)
     if (res.code === 0) {
       stockData.value = res.data
+    }
+    const typeRes = await identifyStockType(stockCode.value)
+    if (typeRes.code === 0) {
+      stockData.value.asset_type = typeRes.data?.type || 'stock'
     }
   } catch (error) {
     console.error('获取行情失败:', error)

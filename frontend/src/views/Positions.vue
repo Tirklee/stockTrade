@@ -21,6 +21,11 @@
       <el-table :data="filteredPositions" v-loading="loading" stripe border>
         <el-table-column prop="stock_code" label="代码" width="100" fixed />
         <el-table-column prop="stock_name" label="名称" width="120" fixed />
+        <el-table-column label="类型" width="80">
+          <template #default="{ row }">
+            {{ row.asset_type === 'fund' ? '基金' : '股票' }}
+          </template>
+        </el-table-column>
         <el-table-column prop="total_quantity" label="持股数" width="90" align="right" sortable />
         <el-table-column prop="avg_cost" label="成本价" width="100" align="right" sortable>
           <template #default="{ row }">
@@ -61,6 +66,25 @@
       </el-table>
 
       <el-empty v-if="!loading && positions.length === 0" description="暂无持仓" />
+
+      <el-pagination
+        v-if="portfolioStore.total > 0"
+        v-model:current-page="currentPage"
+        v-model:page-size="pageSize"
+        :total="portfolioStore.total"
+        :page-sizes="[10, 20, 50, 100]"
+        layout="total, sizes, prev, pager, next, jumper"
+        style="margin-top: 20px"
+        @size-change="handlePageChange"
+        @current-change="handlePageChange"
+      >
+        <template #first>
+          <span class="page-btn" @click="goFirst">首页</span>
+        </template>
+        <template #last>
+          <span class="page-btn" @click="goLast">末页</span>
+        </template>
+      </el-pagination>
     </el-card>
 
     <trade-dialog
@@ -69,6 +93,7 @@
       :stock-code="selectedStock.stock_code"
       :stock-name="selectedStock.stock_name"
       :current-price="selectedStock.current_price"
+      :asset-type="selectedStock.asset_type || 'stock'"
       :available-quantity="selectedStock.available_quantity"
       @success="handleTradeSuccess"
     />
@@ -76,7 +101,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { usePortfolioStore } from '../store/portfolio'
@@ -90,15 +115,37 @@ const portfolioStore = usePortfolioStore()
 const searchKeyword = ref('')
 const tradeDialogVisible = ref(false)
 const tradeType = ref('buy')
+const currentPage = ref(1)
+const pageSize = ref(20)
 const selectedStock = ref({
   stock_code: '',
   stock_name: '',
   current_price: 0,
+  asset_type: 'stock',
   available_quantity: 999999
 })
 
 const positions = computed(() => portfolioStore.positions)
 const loading = computed(() => portfolioStore.loading)
+
+const handlePageChange = () => {
+  portfolioStore.fetchPositions(currentPage.value, pageSize.value)
+}
+
+const goFirst = () => {
+  currentPage.value = 1
+  portfolioStore.fetchPositions(1, pageSize.value)
+}
+
+const goLast = () => {
+  currentPage.value = Math.ceil(portfolioStore.total / pageSize.value)
+  portfolioStore.fetchPositions(currentPage.value, pageSize.value)
+}
+
+watch(searchKeyword, () => {
+  currentPage.value = 1
+  portfolioStore.fetchPositions(1, pageSize.value)
+})
 
 const filteredPositions = computed(() => {
   if (!searchKeyword.value) return positions.value
@@ -131,6 +178,7 @@ const handleTrade = async (row, type) => {
     stock_code: row.stock_code,
     stock_name: row.stock_name,
     current_price: row.current_price,
+    asset_type: row.asset_type || 'stock',
     available_quantity: row.available_quantity
   }
 
@@ -177,5 +225,10 @@ onMounted(() => {
 
 .pnl-negative {
   color: #f56c6c;
+}
+
+.page-btn {
+  cursor: pointer;
+  color: var(--el-color-primary);
 }
 </style>
