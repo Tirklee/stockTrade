@@ -18,32 +18,52 @@ from app.models import TradeRecord, Position, Broker
 def generate_stocks(count=200):
     """生成指定数量的股票数据"""
     stocks = []
-    prefixes = ['600', '601', '603', '000', '002', '300', '688']
+    # 真实股票代码前缀和数量配置
+    stock_pools = [
+        ('600', 50),   # 上证主板
+        ('601', 30),  # 上证主板
+        ('603', 40),  # 上证主板
+        ('000', 30),  # 深证主板
+        ('002', 30),  # 中小板
+        ('300', 20),  # 创业板
+        ('688', 20),  # 科创板
+    ]
     stock_names = [
         '科技', '银行', '证券', '保险', '医药', '白酒', '新能源', '芯片', '通信',
         '地产', '基建', '消费', '农业', '军工', '环保', '物流', '旅游', '教育',
         '传媒', '机械', '化工', '钢铁', '煤炭', '有色', '电力', '公路', '港口',
-        '航空', '航运', '房地产', '建筑', '装修', '家电', '纺织', '食品', '农业',
-        '林业', '牧业', '渔业', '采掘', '金属', '非金属', '电子', '软件', '互联网'
+        '航空', '航运', '房地产', '建筑', '装修', '家电', '纺织', '食品', '电子',
+        '软件', '互联网', '5G', '人工智能', '云计算', '大数据', '物联网'
     ]
     companies = [
         '华', '中', '国', '东', '西', '南', '北', '大', '小', '长', '平', '安',
-        '高', '新', '兴', '旺', '福', '泰', '龙', '凤', '鹏', '鹰', '虎', '狮'
+        '高', '新', '兴', '旺', '福', '泰', '龙', '凤', '鹏', '鹰', '虎', '狮',
+        '科', '创', '智', '能', '光', '电', '网', '联', '云', '数', '智'
     ]
 
-    for _ in range(count):
-        prefix = random.choice(prefixes)
-        code = f"{prefix}{random.randint(100, 999):03d}{random.randint(100, 999):03d}"
-        name_prefix = random.choice(stock_names)
-        name_suffix = random.choice(companies) + random.choice(['', '公司', '集团', '股份', '实业'])
-        name = f"{name_prefix}{name_suffix}"
+    used_codes = set()
 
-        stocks.append({
-            'code': code,
-            'name': name,
-            'asset_type': 'stock'
-        })
-    return stocks
+    for prefix, num in stock_pools:
+        for _ in range(num):
+            # 确保代码唯一
+            while True:
+                suffix = f"{random.randint(0, 999):03d}"
+                code = f"{prefix}{suffix}"
+                if code not in used_codes:
+                    used_codes.add(code)
+                    break
+
+            name_prefix = random.choice(stock_names)
+            name_suffix = random.choice(companies) + random.choice(['', '公司', '集团', '股份', '实业', '科技'])
+            name = f"{name_prefix}{name_suffix}"
+
+            stocks.append({
+                'code': code,
+                'name': name,
+                'asset_type': 'stock'
+            })
+
+    return stocks[:count]
 
 
 def create_mock_data(record_count=10000):

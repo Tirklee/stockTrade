@@ -24,7 +24,11 @@
       </template>
 
       <el-table :data="trades" v-loading="loading" stripe border>
-        <el-table-column prop="trade_time" label="交易时间" width="160" sortable />
+        <el-table-column prop="trade_time" label="交易时间" width="100" sortable>
+          <template #default="{ row }">
+            {{ formatDate(row.trade_time) }}
+          </template>
+        </el-table-column>
         <el-table-column prop="stock_code" label="代码" width="100" />
         <el-table-column prop="stock_name" label="名称" width="120" />
         <el-table-column label="类型" width="80">
@@ -112,6 +116,11 @@ const goFirst = () => {
 const goLast = () => {
   currentPage.value = Math.ceil(total.value / pageSize.value)
   loadTrades()
+}
+
+const formatDate = (dateStr) => {
+  if (!dateStr) return '--'
+  return dateStr.split('T')[0]
 }
 
 const formatMoney = (num) => {

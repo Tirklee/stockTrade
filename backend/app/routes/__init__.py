@@ -8,6 +8,7 @@ from app.services.position_service import PositionService
 from app.services.trade_service import TradeService
 from app.services.stock_service import StockService
 from app.services.broker_service import get_broker_commission_info
+from app.services.news_service import NewsService
 from app.models import Broker
 
 api_bp = Blueprint('api', __name__)
@@ -127,6 +128,99 @@ def get_position_cost_detail(stock_code):
             'cost_records': cost_records
         }
     })
+
+
+@api_bp.route('/positions', methods=['POST'])
+def create_position():
+    """新增持仓"""
+    data = request.get_json()
+
+    stock_code = data.get('stock_code')
+    stock_name = data.get('stock_name')
+    total_quantity = data.get('total_quantity')
+    avg_cost = data.get('avg_cost')
+    asset_type = data.get('asset_type', 'stock')
+    broker_id = data.get('broker_id')
+
+    if not all([stock_code, stock_name, total_quantity, avg_cost]):
+        return jsonify({
+            'code': 400,
+            'message': '缺少必要参数'
+        }), 400
+
+    result = PositionService.create_position(
+        stock_code=stock_code,
+        stock_name=stock_name,
+        total_quantity=total_quantity,
+        avg_cost=avg_cost,
+        asset_type=asset_type,
+        broker_id=broker_id
+    )
+
+    if result['success']:
+        return jsonify({
+            'code': 0,
+            'message': result['message'],
+            'data': result['data']
+        })
+    else:
+        return jsonify({
+            'code': 400,
+            'message': result['message']
+        }), 400
+
+
+@api_bp.route('/positions/<stock_code>', methods=['PUT'])
+def update_position(stock_code):
+    """修改持仓"""
+    data = request.get_json()
+
+    total_quantity = data.get('total_quantity')
+    avg_cost = data.get('avg_cost')
+    broker_id = data.get('broker_id')
+
+    if not all([stock_code, total_quantity, avg_cost]):
+        return jsonify({
+            'code': 400,
+            'message': '缺少必要参数'
+        }), 400
+
+    result = PositionService.update_position(
+        stock_code=stock_code,
+        total_quantity=total_quantity,
+        avg_cost=avg_cost,
+        broker_id=broker_id
+    )
+
+    if result['success']:
+        return jsonify({
+            'code': 0,
+            'message': result['message'],
+            'data': result['data']
+        })
+    else:
+        return jsonify({
+            'code': 400,
+            'message': result['message']
+        }), 400
+
+
+@api_bp.route('/positions/<stock_code>', methods=['DELETE'])
+def delete_position(stock_code):
+    """删除持仓"""
+    broker_id = request.args.get('broker_id', type=int)
+    result = PositionService.delete_position(stock_code, broker_id)
+
+    if result['success']:
+        return jsonify({
+            'code': 0,
+            'message': result['message']
+        })
+    else:
+        return jsonify({
+            'code': 400,
+            'message': result['message']
+        }), 400
 
 
 # ==================== 组合总览API ====================
@@ -381,6 +475,51 @@ def calculate_fee():
         'code': 0,
         'data': fee_info
     })
+
+
+# ==================== 财经新闻API ====================
+
+@api_bp.route('/news', methods=['GET'])
+def get_news():
+    """获取财经新闻"""
+    news_type = request.args.get('type', 'news')
+    page = request.args.get('page', 1, type=int)
+    page_size = request.args.get('page_size', 10, type=int)
+
+    result = NewsService.get_financial_news(
+        news_type=news_type,
+        page=page,
+        page_size=page_size
+    )
+
+    if result['success']:
+        return jsonify({
+            'code': 0,
+            'data': result['data'],
+            'total': result.get('total', 0)
+        })
+    else:
+        return jsonify({
+            'code': 500,
+            'message': result.get('error', '获取新闻失败')
+        }), 500
+
+
+@api_bp.route('/news/important-events', methods=['GET'])
+def get_important_events():
+    """获取影响股市的重大事件"""
+    result = NewsService.get_important_events()
+
+    if result['success']:
+        return jsonify({
+            'code': 0,
+            'data': result['data']
+        })
+    else:
+        return jsonify({
+            'code': 500,
+            'message': result.get('error', '获取重大事件失败')
+        }), 500
 
 
 # ==================== 健康检查 ====================

@@ -54,9 +54,13 @@ class Position(db.Model):
     __tablename__ = 'positions'
 
     id = db.Column(db.Integer, primary_key=True)
-    stock_code = db.Column(db.String(10), nullable=False, unique=True, index=True)
+    stock_code = db.Column(db.String(10), nullable=False, index=True)
     stock_name = db.Column(db.String(100), nullable=False)
     asset_type = db.Column(db.String(20), default='stock')
+
+    # 券商
+    broker_id = db.Column(db.Integer, db.ForeignKey('brokers.id'), nullable=True)
+    broker = db.relationship('Broker', backref='positions')
 
     # 持仓数量
     total_quantity = db.Column(db.Integer, default=0)  # 总持股数
@@ -81,12 +85,19 @@ class Position(db.Model):
     # 关系
     trades = db.relationship('TradeRecord', backref='position', lazy='dynamic')
 
+    # 联合唯一索引：同一股票在同一券商只能有一条持仓记录
+    __table_args__ = (
+        db.UniqueConstraint('stock_code', 'broker_id', name='uq_position_stock_broker'),
+    )
+
     def to_dict(self):
         return {
             'id': self.id,
             'stock_code': self.stock_code,
             'stock_name': self.stock_name,
             'asset_type': self.asset_type,
+            'broker_id': self.broker_id,
+            'broker_name': self.broker.name if self.broker else None,
             'total_quantity': self.total_quantity,
             'available_quantity': self.available_quantity,
             'frozen_quantity': self.frozen_quantity,

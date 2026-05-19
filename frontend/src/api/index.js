@@ -18,6 +18,18 @@ export function getPositionCostDetail(code) {
   return request.get(`/positions/${code}/cost-detail`)
 }
 
+export function createPosition(data) {
+  return request.post('/positions', data)
+}
+
+export function updatePosition(code, data) {
+  return request.put(`/positions/${code}`, data)
+}
+
+export function deletePosition(code) {
+  return request.delete(`/positions/${code}`)
+}
+
 // 交易管理
 export function buyStock(data) {
   return request.post('/trades/buy', data)
@@ -64,4 +76,13 @@ export function identifyStockType(code) {
 // 费用计算
 export function calculateFee(data) {
   return request.post('/calculator/fee', data)
+}
+
+// 财经新闻
+export function getFinancialNews(params) {
+  return request.get('/news', { params })
+}
+
+export function getImportantEvents() {
+  return request.get('/news/important-events')
 }

@@ -76,7 +76,7 @@ onMounted(() => {
 
 <style scoped>
 .portfolio-summary {
-  margin-bottom: 20px;
+  margin-bottom: 12px;
 }
 
 .summary-row {
@@ -84,7 +84,7 @@ onMounted(() => {
 }
 
 .summary-card {
-  height: 120px;
+  height: 80px;
 }
 
 .summary-item {
@@ -96,13 +96,13 @@ onMounted(() => {
 }
 
 .summary-label {
-  font-size: 14px;
+  font-size: 12px;
   color: #909399;
-  margin-bottom: 8px;
+  margin-bottom: 4px;
 }
 
 .summary-value {
-  font-size: 18px;
+  font-size: 15px;
   font-weight: bold;
 }
 

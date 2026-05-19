@@ -5,6 +5,14 @@ const request = axios.create({
   timeout: 10000
 })
 
+request.put = function(url, data, config) {
+  return this({ method: 'PUT', url, data, ...config })
+}
+
+request.delete = function(url, config) {
+  return this({ method: 'DELETE', url, ...config })
+}
+
 request.interceptors.response.use(
   response => response.data,
   error => {

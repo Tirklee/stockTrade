@@ -12,15 +12,21 @@ class PositionService:
     """持仓服务类"""
 
     @staticmethod
-    def get_or_create_position(stock_code, stock_name, asset_type='stock'):
+    def get_or_create_position(stock_code, stock_name, asset_type='stock', broker_id=None):
         """获取或创建持仓记录"""
-        position = Position.query.filter_by(stock_code=stock_code).first()
+        query = Position.query.filter_by(stock_code=stock_code)
+        if broker_id is not None:
+            query = query.filter_by(broker_id=broker_id)
+        else:
+            query = query.filter(Position.broker_id.is_(None))
+        position = query.first()
 
         if not position:
             position = Position(
                 stock_code=stock_code,
                 stock_name=stock_name,
                 asset_type=asset_type,
+                broker_id=broker_id,
                 total_quantity=0,
                 available_quantity=0,
                 frozen_quantity=0,
@@ -122,9 +128,14 @@ class PositionService:
         }
 
     @staticmethod
-    def get_position_by_code(stock_code):
+    def get_position_by_code(stock_code, broker_id=None):
         """根据股票代码获取持仓"""
-        position = Position.query.filter_by(stock_code=stock_code).first()
+        query = Position.query.filter_by(stock_code=stock_code)
+        if broker_id is not None:
+            query = query.filter_by(broker_id=broker_id)
+        else:
+            query = query.filter(Position.broker_id.is_(None))
+        position = query.first()
         return position.to_dict() if position else None
 
     @staticmethod
@@ -173,3 +184,76 @@ class PositionService:
             'stock_count': stock_count,
             'update_time': datetime.now().strftime('%Y-%m-%d %H:%M:%S')
         }
+
+    @staticmethod
+    def create_position(stock_code, stock_name, total_quantity, avg_cost, asset_type='stock', broker_id=None):
+        """新增持仓"""
+        query = Position.query.filter_by(stock_code=stock_code)
+        if broker_id is not None:
+            query = query.filter_by(broker_id=broker_id)
+        else:
+            query = query.filter(Position.broker_id.is_(None))
+        existing = query.first()
+        if existing:
+            return {'success': False, 'message': '该股票在该券商已有持仓'}
+
+        position = Position(
+            stock_code=stock_code,
+            stock_name=stock_name,
+            asset_type=asset_type,
+            broker_id=broker_id,
+            total_quantity=total_quantity,
+            available_quantity=total_quantity,
+            frozen_quantity=0,
+            avg_cost=Decimal(str(avg_cost)),
+            total_cost=Decimal(str(total_quantity * avg_cost)),
+            current_price=Decimal(str(avg_cost)),
+            current_value=Decimal(str(total_quantity * avg_cost)),
+            unrealized_pnl=Decimal('0'),
+            unrealized_pnl_rate=Decimal('0')
+        )
+        db.session.add(position)
+        db.session.commit()
+
+        return {'success': True, 'message': '新增成功', 'data': position.to_dict()}
+
+    @staticmethod
+    def update_position(stock_code, total_quantity, avg_cost, broker_id=None):
+        """修改持仓"""
+        query = Position.query.filter_by(stock_code=stock_code)
+        if broker_id is not None:
+            query = query.filter_by(broker_id=broker_id)
+        else:
+            query = query.filter(Position.broker_id.is_(None))
+        position = query.first()
+        if not position:
+            return {'success': False, 'message': '持仓不存在'}
+
+        position.total_quantity = total_quantity
+        position.available_quantity = total_quantity
+        position.avg_cost = Decimal(str(avg_cost))
+        position.total_cost = Decimal(str(total_quantity * avg_cost))
+        position.updated_at = datetime.now()
+        db.session.commit()
+
+        return {'success': True, 'message': '修改成功', 'data': position.to_dict()}
+
+    @staticmethod
+    def delete_position(stock_code, broker_id=None):
+        """删除持仓"""
+        query = Position.query.filter_by(stock_code=stock_code)
+        if broker_id is not None:
+            query = query.filter_by(broker_id=broker_id)
+        else:
+            query = query.filter(Position.broker_id.is_(None))
+        position = query.first()
+        if not position:
+            return {'success': False, 'message': '持仓不存在'}
+
+        if position.total_quantity > 0:
+            return {'success': False, 'message': '该股存在持股数，请先卖出或清仓后再删除'}
+
+        db.session.delete(position)
+        db.session.commit()
+
+        return {'success': True, 'message': '删除成功'}

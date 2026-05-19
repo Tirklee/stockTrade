@@ -32,9 +32,9 @@ class TradeService:
             dict: 交易结果
         """
         try:
-            # 获取持仓记录
+            # 获取持仓记录（按股票代码和券商查询）
             position = PositionService.get_or_create_position(
-                stock_code, stock_name, asset_type
+                stock_code, stock_name, asset_type, broker_id
             )
 
             # 获取券商佣金信息
@@ -131,13 +131,14 @@ class TradeService:
             dict: 交易结果
         """
         try:
-            # 获取持仓
-            position = Position.query.filter_by(stock_code=stock_code).first()
+            # 获取持仓（按股票代码和券商查询）
+            query = Position.query.filter_by(stock_code=stock_code, broker_id=broker_id)
+            position = query.first()
 
             if not position:
                 return {
                     'success': False,
-                    'message': '该股票没有持仓',
+                    'message': '该股票在该券商没有持仓',
                     'data': None
                 }
 
