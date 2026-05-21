@@ -282,45 +282,104 @@ const updateCharts = () => {
   const ma = calcMA(data)
   const candleData = data.map(d => [d[0], d[3], d[2], d[1]])
 
-  // 主图：K线 + MA
-  mainChart.setOption({
-    backgroundColor: '#fff',
-    animation: false,
-    grid: { left: 60, right: 15, top: 10, bottom: 30 },
-    xAxis: [{
-      type: 'category',
-      data: dates,
-      axisLine: { lineStyle: { color: '#ccc' } },
-      axisLabel: { color: '#666', fontSize: 11, interval: Math.floor(dates.length / 6) },
-      splitLine: { show: false }
-    }],
-    yAxis: [{
-      type: 'value',
-      scale: true,
-      position: 'left',
-      axisLine: { lineStyle: { color: '#ccc' } },
-      axisLabel: { color: '#666', fontSize: 11, formatter: v => v.toFixed(0) },
-      splitLine: { lineStyle: { color: '#eee', type: 'dashed' } },
-      splitNumber: 4
-    }],
-    dataZoom: [
-      { type: 'inside', xAxisIndex: 0, start: 0, end: 100 },
-      { type: 'slider', xAxisIndex: 0, start: 0, end: 100, height: 16, bottom: 5, borderColor: '#eee', backgroundColor: '#fafafa', fillerColor: 'rgba(100, 150, 255, 0.1)', handleStyle: { color: '#999' }, textStyle: { color: '#999', fontSize: 10 } }
-    ],
-    series: [
-      {
-        name: 'K线',
-        type: 'candlestick',
-        data: candleData,
-        itemStyle: { color: COLORS.up, color0: COLORS.down, borderColor: COLORS.up, borderColor0: COLORS.down }
+  // 主图：根据周期选择显示类型
+  if (period.value === '分时') {
+    // 分时图：走势线 + 均价线 + 昨日收盘线
+    const prices = data.map(d => d[1])  // 收盘价作为分时价格
+    const avgPrices = []
+    let sum = 0
+    for (let i = 0; i < prices.length; i++) {
+      sum += prices[i]
+      avgPrices.push(+(sum / (i + 1)).toFixed(2))
+    }
+    const prevClose = data[0][0] + (data[0][1] - data[0][0]) * 0.5  // 模拟昨日收盘价
+
+    mainChart.setOption({
+      backgroundColor: '#fff',
+      animation: false,
+      grid: { left: 60, right: 15, top: 10, bottom: 30 },
+      tooltip: {
+        trigger: 'axis',
+        axisPointer: { type: 'cross' },
+        backgroundColor: 'rgba(50, 50, 50, 0.9)',
+        borderColor: '#333',
+        textStyle: { color: '#fff', fontSize: 12 }
       },
-      { name: 'MA5', type: 'line', data: ma.ma5, smooth: true, lineStyle: { width: 1.5, color: COLORS.ma5 }, symbol: 'none' },
-      { name: 'MA10', type: 'line', data: ma.ma10, smooth: true, lineStyle: { width: 1.5, color: COLORS.ma10 }, symbol: 'none' },
-      { name: 'MA20', type: 'line', data: ma.ma20, smooth: true, lineStyle: { width: 1.5, color: COLORS.ma20 }, symbol: 'none' },
-      { name: 'MA30', type: 'line', data: ma.ma30, smooth: true, lineStyle: { width: 1.5, color: COLORS.ma30 }, symbol: 'none' },
-      { name: 'MA60', type: 'line', data: ma.ma60, smooth: true, lineStyle: { width: 1.5, color: COLORS.ma60 }, symbol: 'none' }
-    ]
-  })
+      legend: {
+        data: ['分时线', '均价线', '昨收线'],
+        bottom: 5,
+        textStyle: { fontSize: 11 }
+      },
+      xAxis: [{
+        type: 'category',
+        data: dates,
+        axisLine: { lineStyle: { color: '#ccc' } },
+        axisLabel: { color: '#666', fontSize: 11, interval: Math.floor(dates.length / 6) },
+        splitLine: { show: false }
+      }],
+      yAxis: [{
+        type: 'value',
+        scale: true,
+        position: 'left',
+        axisLine: { lineStyle: { color: '#ccc' } },
+        axisLabel: { color: '#666', fontSize: 11, formatter: v => v.toFixed(0) },
+        splitLine: { lineStyle: { color: '#eee', type: 'dashed' } },
+        splitNumber: 4
+      }],
+      series: [
+        { name: '分时线', type: 'line', data: prices, smooth: true, lineStyle: { width: 1.5, color: COLORS.up }, symbol: 'none', areaStyle: { color: 'rgba(239, 83, 80, 0.1)' } },
+        { name: '均价线', type: 'line', data: avgPrices, smooth: true, lineStyle: { width: 1.5, color: '#f5a74e' }, symbol: 'none' },
+        { name: '昨收线', type: 'line', data: Array(dates.length).fill(prevClose), smooth: false, lineStyle: { width: 1, type: 'dashed', color: '#999' }, symbol: 'none' }
+      ]
+    })
+  } else {
+    // K线图
+    mainChart.setOption({
+      backgroundColor: '#fff',
+      animation: false,
+      grid: { left: 60, right: 15, top: 10, bottom: 30 },
+      tooltip: {
+        trigger: 'axis',
+        axisPointer: { type: 'cross', crossStyle: { color: '#999' } },
+        backgroundColor: 'rgba(50, 50, 50, 0.9)',
+        borderColor: '#333',
+        textStyle: { color: '#fff', fontSize: 12 }
+      },
+      xAxis: [{
+        type: 'category',
+        data: dates,
+        axisLine: { lineStyle: { color: '#ccc' } },
+        axisLabel: { color: '#666', fontSize: 11, interval: Math.floor(dates.length / 6) },
+        splitLine: { show: false }
+      }],
+      yAxis: [{
+        type: 'value',
+        scale: true,
+        position: 'left',
+        axisLine: { lineStyle: { color: '#ccc' } },
+        axisLabel: { color: '#666', fontSize: 11, formatter: v => v.toFixed(0) },
+        splitLine: { lineStyle: { color: '#eee', type: 'dashed' } },
+        splitNumber: 4
+      }],
+      dataZoom: [
+        { type: 'inside', xAxisIndex: 0, start: 0, end: 100 },
+        { type: 'slider', xAxisIndex: 0, start: 0, end: 100, height: 16, bottom: 5, borderColor: '#eee', backgroundColor: '#fafafa', fillerColor: 'rgba(100, 150, 255, 0.1)', handleStyle: { color: '#999' }, textStyle: { color: '#999', fontSize: 10 } }
+      ],
+      series: [
+        {
+          name: 'K线',
+          type: 'candlestick',
+          data: candleData,
+          itemStyle: { color: COLORS.up, color0: COLORS.down, borderColor: COLORS.up, borderColor0: COLORS.down }
+        },
+        { name: 'MA5', type: 'line', data: ma.ma5, smooth: true, lineStyle: { width: 1.5, color: COLORS.ma5 }, symbol: 'none' },
+        { name: 'MA10', type: 'line', data: ma.ma10, smooth: true, lineStyle: { width: 1.5, color: COLORS.ma10 }, symbol: 'none' },
+        { name: 'MA20', type: 'line', data: ma.ma20, smooth: true, lineStyle: { width: 1.5, color: COLORS.ma20 }, symbol: 'none' },
+        { name: 'MA30', type: 'line', data: ma.ma30, smooth: true, lineStyle: { width: 1.5, color: COLORS.ma30 }, symbol: 'none' },
+        { name: 'MA60', type: 'line', data: ma.ma60, smooth: true, lineStyle: { width: 1.5, color: COLORS.ma60 }, symbol: 'none' }
+      ]
+    })
+  }
 
   // 副图：根据选择的指标显示
   updateSubChart(dates, data)

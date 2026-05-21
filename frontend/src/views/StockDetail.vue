@@ -20,18 +20,12 @@
             </div>
           </template>
 
-          <div class="chart-container" ref="chartRef"></div>
-
-          <div class="kline-tabs">
-            <el-radio-group v-model="klinePeriod" size="small" @change="handlePeriodChange">
-              <el-radio-button label="1min">1分钟</el-radio-button>
-              <el-radio-button label="5min">5分钟</el-radio-button>
-              <el-radio-button label="15min">15分钟</el-radio-button>
-              <el-radio-button label="60min">60分钟</el-radio-button>
-              <el-radio-button label="daily">日K</el-radio-button>
-              <el-radio-button label="weekly">周K</el-radio-button>
-              <el-radio-button label="monthly">月K</el-radio-button>
-            </el-radio-group>
+          <div class="chart-wrapper">
+            <KLineChart
+              ref="klineChart"
+              :code="stockCode"
+              :name="stockData.stock_name || stockCode"
+            />
           </div>
         </el-card>
       </el-col>
@@ -118,24 +112,19 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { getStockRealtime, getStockKline, getPosition, identifyStockType } from '../api'
+import { getStockRealtime, getPosition, identifyStockType } from '../api'
 import TradeDialog from '../components/TradeDialog.vue'
-import * as echarts from 'echarts'
+import KLineChart from '../components/KLineChart.vue'
 
 const route = useRoute()
 const router = useRouter()
 
 const stockCode = computed(() => route.params.code)
-const chartRef = ref()
-let chartInstance = null
-
-const stockData = ref({})
-const positionData = ref(null)
-const klinePeriod = ref('daily')
-const klineData = ref([])
+const klineChart = ref(null)
 
 const tradeDialogVisible = ref(false)
 const tradeType = ref('buy')
+const stockData = ref({})
 
 const priceChangeClass = computed(() => {
   const change = stockData.value.change_pct
@@ -161,6 +150,22 @@ const formatVolume = (num) => {
   return (num / 10000).toFixed(2) + '万'
 }
 
+const positionData = ref(null)
+
+const loadPosition = async () => {
+  try {
+    const res = await getPosition(stockCode.value)
+    if (res.code === 0) {
+      positionData.value = res.data
+    } else {
+      positionData.value = null
+    }
+  } catch (error) {
+    console.error('获取持仓失败:', error)
+    positionData.value = null
+  }
+}
+
 const loadRealtime = async () => {
   try {
     const res = await getStockRealtime(stockCode.value)
@@ -176,87 +181,8 @@ const loadRealtime = async () => {
   }
 }
 
-const loadKline = async () => {
-  try {
-    const res = await getStockKline(stockCode.value, { period: klinePeriod.value })
-    if (res.code === 0) {
-      klineData.value = res.data.data
-      renderChart()
-    }
-  } catch (error) {
-    console.error('获取K线失败:', error)
-  }
-}
-
-const loadPosition = async () => {
-  try {
-    const res = await getPosition(stockCode.value)
-    if (res.code === 0) {
-      positionData.value = res.data
-    }
-  } catch {
-    positionData.value = null
-  }
-}
-
-const renderChart = () => {
-  if (!chartRef.value) return
-
-  if (!chartInstance) {
-    chartInstance = echarts.init(chartRef.value)
-  }
-
-  const dates = klineData.value.map(item => item[0])
-  const data = klineData.value.map(item => ({
-    date: item[0],
-    open: parseFloat(item[1]),
-    high: parseFloat(item[2]),
-    low: parseFloat(item[3]),
-    close: parseFloat(item[4]),
-    volume: parseInt(item[5])
-  }))
-
-  const option = {
-    tooltip: {
-      trigger: 'axis',
-      axisPointer: { type: 'line' }
-    },
-    grid: [
-      { left: '10%', right: '8%', top: '10%', height: '60%' },
-      { left: '10%', right: '8%', top: '75%', height: '15%' }
-    ],
-    xAxis: [
-      { type: 'category', data: dates, gridIndex: 0, boundaryGap: false },
-      { type: 'category', data: dates, gridIndex: 1, boundaryGap: false }
-    ],
-    yAxis: [
-      { scale: true, gridIndex: 0 },
-      { scale: true, gridIndex: 1 }
-    ],
-    series: [
-      {
-        name: 'K线',
-        type: 'candlestick',
-        data: data.map(d => [d.open, d.close, d.low, d.high]),
-        xAxisIndex: 0,
-        yAxisIndex: 0
-      },
-      {
-        name: '成交量',
-        type: 'bar',
-        data: data.map(d => d.volume),
-        xAxisIndex: 1,
-        yAxisIndex: 1
-      }
-    ]
-  }
-
-  chartInstance.setOption(option)
-}
-
-const handlePeriodChange = () => {
-  loadKline()
-}
+// K线数据由子组件自行加载（使用模拟数据）
+// 实际项目需对接后端API：/api/stocks/{code}/kline?period=...
 
 const showTrade = (type) => {
   tradeType.value = type
@@ -265,6 +191,7 @@ const showTrade = (type) => {
 
 const handleTradeSuccess = () => {
   loadPosition()
+  loadRealtime()
 }
 
 const goBack = () => {
@@ -275,7 +202,6 @@ let refreshTimer = null
 
 onMounted(() => {
   loadRealtime()
-  loadKline()
   loadPosition()
 
   refreshTimer = setInterval(() => {
@@ -287,21 +213,23 @@ onUnmounted(() => {
   if (refreshTimer) {
     clearInterval(refreshTimer)
   }
-  if (chartInstance) {
-    chartInstance.dispose()
-  }
 })
 
 watch(stockCode, () => {
   loadRealtime()
-  loadKline()
   loadPosition()
 })
+
+// 监听子组件 period/subIndicator 的变化来重新加载图表数据（如需动态获取）
 </script>
 
 <style scoped>
+.stock-detail {
+  padding: 8px;
+}
+
 .mt-20 {
-  margin-top: 20px;
+  margin-top: 8px;
 }
 
 .card-header {
@@ -326,13 +254,22 @@ watch(stockCode, () => {
   margin-right: 10px;
 }
 
-.chart-container {
-  height: 400px;
-  margin: 20px 0;
+.chart-tabs {
+  margin-bottom: 8px;
 }
 
-.kline-tabs {
-  margin-top: 10px;
+.chart-tabs :deep(.el-tabs__header) {
+  margin-bottom: 0;
+}
+
+.chart-wrapper {
+  height: 320px;
+}
+
+.indicator-selector {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
 }
 
 .positive {

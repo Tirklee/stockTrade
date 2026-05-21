@@ -23,20 +23,21 @@
         </div>
       </template>
 
-      <el-table :data="trades" v-loading="loading" stripe border>
-        <el-table-column prop="trade_time" label="交易时间" width="100" sortable>
+      <div class="table-scroll">
+        <el-table :data="trades" v-loading="loading" stripe border table-layout="fixed">
+        <el-table-column prop="trade_time" label="交易时间" width="170" sortable fixed>
           <template #default="{ row }">
             {{ formatDate(row.trade_time) }}
           </template>
         </el-table-column>
-        <el-table-column prop="stock_code" label="代码" width="100" />
-        <el-table-column prop="stock_name" label="名称" width="120" />
-        <el-table-column label="类型" width="80">
+        <el-table-column prop="stock_code" label="代码" width="100" fixed />
+        <el-table-column prop="stock_name" label="名称" width="120" fixed />
+        <el-table-column label="类型" width="80" fixed>
           <template #default="{ row }">
             {{ row.asset_type === 'fund' ? '基金' : '股票' }}
           </template>
         </el-table-column>
-        <el-table-column label="方向" width="80">
+        <el-table-column label="方向" width="80" fixed>
           <template #default="{ row }">
             <el-tag :type="row.trade_type === 'buy' ? 'success' : 'danger'" size="small">
               {{ row.trade_type === 'buy' ? '买入' : '卖出' }}
@@ -72,6 +73,7 @@
         <el-table-column prop="broker_name" label="券商" width="100" />
         <el-table-column prop="trade_basis" label="交易依据" min-width="150" show-overflow-tooltip />
       </el-table>
+      </div>
 
       <el-pagination
         v-model:current-page="currentPage"
@@ -182,5 +184,22 @@ onMounted(() => {
 .page-btn {
   cursor: pointer;
   color: var(--el-color-primary);
+}
+
+.table-scroll {
+  overflow-x: auto;
+}
+
+:deep(.el-table) {
+  width: max-content !important;
+}
+
+:deep(.el-table__body-wrapper) {
+  overflow-x: auto;
+}
+
+:deep(.el-table__fixed),
+:deep(.el-table__fixed-right) {
+  white-space: nowrap !important;
 }
 </style>

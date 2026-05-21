@@ -19,30 +19,31 @@
         </div>
       </template>
 
-      <el-table :data="filteredPositions" v-loading="loading" stripe border size="small">
-        <el-table-column prop="stock_code" label="代码" width="100" fixed>
+      <div class="table-scroll">
+        <el-table :data="filteredPositions" v-loading="loading" stripe border size="small" table-layout="fixed">
+        <el-table-column prop="stock_code" label="代码" width="120" fixed>
           <template #default="{ row }">
             <el-link type="primary" @click="viewDetail(row)">{{ row.stock_code }}</el-link>
           </template>
         </el-table-column>
-        <el-table-column prop="stock_name" label="名称" width="80" fixed />
-        <el-table-column label="类型" width="60">
+        <el-table-column prop="stock_name" label="名称" width="170" fixed />
+        <el-table-column label="类型" width="80" fixed>
           <template #default="{ row }">
             {{ row.asset_type === 'fund' ? '基金' : '股票' }}
           </template>
         </el-table-column>
-        <el-table-column prop="total_quantity" label="持股数" width="80" align="right" sortable />
-        <el-table-column prop="avg_cost" label="成本" width="80" align="right" sortable>
+        <el-table-column prop="total_quantity" label="持股数" width="100" align="right" sortable />
+        <el-table-column prop="avg_cost" label="成本" width="100" align="right" sortable>
           <template #default="{ row }">
             {{ row.avg_cost.toFixed(2) }}
           </template>
         </el-table-column>
-        <el-table-column prop="current_price" label="现价" width="80" align="right">
+        <el-table-column prop="current_price" label="现价" width="100" align="right">
           <template #default="{ row }">
             {{ row.current_price.toFixed(2) }}
           </template>
         </el-table-column>
-        <el-table-column label="市值" width="100" align="right" sortable>
+        <el-table-column label="市值" width="150" align="right" sortable>
           <template #default="{ row }">
             {{ formatMoney(row.current_value) }}
           </template>
@@ -54,7 +55,7 @@
             </span>
           </template>
         </el-table-column>
-        <el-table-column label="盈亏比例" width="90" align="right" sortable>
+        <el-table-column label="盈亏比例" width="120" align="right" sortable>
           <template #default="{ row }">
             <span :class="getPnlClass(row.unrealized_pnl_rate)">
               {{ row.unrealized_pnl_rate.toFixed(1) }}%
@@ -69,7 +70,8 @@
             <el-button type="info" size="small" @click="handleDelete(row)">删</el-button>
           </template>
         </el-table-column>
-      </el-table>
+        </el-table>
+      </div>
 
       <el-empty v-if="!loading && positions.length === 0" description="暂无持仓" />
 
@@ -311,5 +313,22 @@ onMounted(() => {
 
 :deep(.el-pagination) {
   font-size: 12px;
+}
+
+.table-scroll {
+  overflow-x: auto;
+}
+
+:deep(.el-table) {
+  width: max-content !important;
+}
+
+:deep(.el-table__body-wrapper) {
+  overflow-x: auto;
+}
+
+:deep(.el-table__fixed),
+:deep(.el-table__fixed-right) {
+  white-space: nowrap !important;
 }
 </style>
