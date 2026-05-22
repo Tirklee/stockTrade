@@ -141,6 +141,8 @@ def create_position():
     avg_cost = data.get('avg_cost')
     asset_type = data.get('asset_type', 'stock')
     broker_id = data.get('broker_id')
+    buy_commission_rate = data.get('buy_commission_rate')
+    sell_commission_rate = data.get('sell_commission_rate')
 
     if not all([stock_code, stock_name, total_quantity, avg_cost]):
         return jsonify({
@@ -154,7 +156,9 @@ def create_position():
         total_quantity=total_quantity,
         avg_cost=avg_cost,
         asset_type=asset_type,
-        broker_id=broker_id
+        broker_id=broker_id,
+        buy_commission_rate=buy_commission_rate,
+        sell_commission_rate=sell_commission_rate
     )
 
     if result['success']:
@@ -178,6 +182,8 @@ def update_position(stock_code):
     total_quantity = data.get('total_quantity')
     avg_cost = data.get('avg_cost')
     broker_id = data.get('broker_id')
+    buy_commission_rate = data.get('buy_commission_rate')
+    sell_commission_rate = data.get('sell_commission_rate')
 
     if not all([stock_code, total_quantity, avg_cost]):
         return jsonify({
@@ -189,7 +195,9 @@ def update_position(stock_code):
         stock_code=stock_code,
         total_quantity=total_quantity,
         avg_cost=avg_cost,
-        broker_id=broker_id
+        broker_id=broker_id,
+        buy_commission_rate=buy_commission_rate,
+        sell_commission_rate=sell_commission_rate
     )
 
     if result['success']:

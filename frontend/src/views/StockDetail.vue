@@ -2,9 +2,9 @@
   <div class="stock-detail">
     <el-page-header @back="goBack" content="股票详情" />
 
-    <el-row :gutter="20" class="mt-20">
+    <el-row :gutter="20" class="mt-20 main-content">
       <el-col :span="16">
-        <el-card>
+        <el-card class="chart-card">
           <template #header>
             <div class="card-header">
               <div class="stock-info">
@@ -110,7 +110,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { getStockRealtime, getPosition, identifyStockType } from '../api'
 import TradeDialog from '../components/TradeDialog.vue'
@@ -207,6 +207,10 @@ onMounted(() => {
   refreshTimer = setInterval(() => {
     loadRealtime()
   }, 30000)
+
+  nextTick(() => {
+    setTimeout(() => klineChart.value?.resizeCharts(), 100)
+  })
 })
 
 onUnmounted(() => {
@@ -226,10 +230,15 @@ watch(stockCode, () => {
 <style scoped>
 .stock-detail {
   padding: 8px;
+  height: calc(100vh - 60px);
+  display: flex;
+  flex-direction: column;
 }
 
 .mt-20 {
   margin-top: 8px;
+  flex: 1;
+  min-height: 0;
 }
 
 .card-header {
@@ -262,8 +271,23 @@ watch(stockCode, () => {
   margin-bottom: 0;
 }
 
+.chart-card {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
+.chart-card :deep(.el-card__body) {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
 .chart-wrapper {
-  height: 320px;
+  flex: 1;
+  min-height: 0;
+  height: auto;
 }
 
 .indicator-selector {

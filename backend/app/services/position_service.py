@@ -186,7 +186,7 @@ class PositionService:
         }
 
     @staticmethod
-    def create_position(stock_code, stock_name, total_quantity, avg_cost, asset_type='stock', broker_id=None):
+    def create_position(stock_code, stock_name, total_quantity, avg_cost, asset_type='stock', broker_id=None, buy_commission_rate=None, sell_commission_rate=None):
         """新增持仓"""
         query = Position.query.filter_by(stock_code=stock_code)
         if broker_id is not None:
@@ -202,6 +202,8 @@ class PositionService:
             stock_name=stock_name,
             asset_type=asset_type,
             broker_id=broker_id,
+            buy_commission_rate=Decimal(str(buy_commission_rate)) if buy_commission_rate else None,
+            sell_commission_rate=Decimal(str(sell_commission_rate)) if sell_commission_rate else None,
             total_quantity=total_quantity,
             available_quantity=total_quantity,
             frozen_quantity=0,
@@ -218,7 +220,7 @@ class PositionService:
         return {'success': True, 'message': '新增成功', 'data': position.to_dict()}
 
     @staticmethod
-    def update_position(stock_code, total_quantity, avg_cost, broker_id=None):
+    def update_position(stock_code, total_quantity, avg_cost, broker_id=None, buy_commission_rate=None, sell_commission_rate=None):
         """修改持仓"""
         query = Position.query.filter_by(stock_code=stock_code)
         if broker_id is not None:
@@ -233,6 +235,10 @@ class PositionService:
         position.available_quantity = total_quantity
         position.avg_cost = Decimal(str(avg_cost))
         position.total_cost = Decimal(str(total_quantity * avg_cost))
+        if buy_commission_rate is not None:
+            position.buy_commission_rate = Decimal(str(buy_commission_rate))
+        if sell_commission_rate is not None:
+            position.sell_commission_rate = Decimal(str(sell_commission_rate))
         position.updated_at = datetime.now()
         db.session.commit()
 

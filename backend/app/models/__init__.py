@@ -62,6 +62,10 @@ class Position(db.Model):
     broker_id = db.Column(db.Integer, db.ForeignKey('brokers.id'), nullable=True)
     broker = db.relationship('Broker', backref='positions')
 
+    # 自定义佣金率（覆盖券商默认费率）
+    buy_commission_rate = db.Column(db.Numeric(8, 4), nullable=True)  # 买入佣金率‰
+    sell_commission_rate = db.Column(db.Numeric(8, 4), nullable=True)  # 卖出佣金率‰
+
     # 持仓数量
     total_quantity = db.Column(db.Integer, default=0)  # 总持股数
     available_quantity = db.Column(db.Integer, default=0)  # 可用数量
@@ -98,6 +102,8 @@ class Position(db.Model):
             'asset_type': self.asset_type,
             'broker_id': self.broker_id,
             'broker_name': self.broker.name if self.broker else None,
+            'buy_commission_rate': float(self.buy_commission_rate) if self.buy_commission_rate else None,
+            'sell_commission_rate': float(self.sell_commission_rate) if self.sell_commission_rate else None,
             'total_quantity': self.total_quantity,
             'available_quantity': self.available_quantity,
             'frozen_quantity': self.frozen_quantity,
